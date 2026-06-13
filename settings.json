@@ -52,6 +52,17 @@
             "statusMessage": "重建 manyread 索引…"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["C:\\Users\\380kk\\.claude\\hooks\\manyread-grounding.mjs"],
+            "timeout": 30,
+            "statusMessage": "manyread 核对…"
+          }
+        ]
       }
     ]
   },

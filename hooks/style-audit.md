@@ -1,6 +1,6 @@
-# Stop hooks：文风审计 + manyread 重建
+# Stop hooks：文风审计、manyread 重建与防漂变核对
 
-这里有两个挂在 `Stop` 事件上的 hook。第一个在每个回合结束前审计回复的文风并在不合格时打断改写，第二个在回合结束后重建 manyread 索引。两者都写进 `settings.json` 的 `hooks.Stop`，互不干扰。
+这里有三个挂在 `Stop` 事件上的 hook。第一个在每个回合结束前审计回复的文风，不合格就打断改写；第二个在回合结束后重建 manyread 索引；第三个在回合结束时检查你是否用 manyread 跟上了项目的真实状态，没跟上就提醒。三个都写进 `settings.json` 的 `hooks.Stop`，互不干扰。
 
 ## style-audit.mjs —— 文风审计（阻塞）
 
@@ -26,3 +26,9 @@
 回合结束后异步运行，不阻塞回复。它先向上查找当前项目是否有 manyread store（`manyread/manyread.json`），没有就直接退出，不在任意仓库乱建索引。有 store 时，它判断源码自上次重建后是否有变化：git 仓库按提交与工作区指纹比对，无变化就跳过；非 git 仓库用 120 秒去抖。确实需要重建时，它先跑 `index_build.py` 重建 L1 索引，再跑 `enrich_treesitter.py` 补回 L2 的符号与边——因为 L1 的全量重建会清空符号表，必须紧接着富化，否则索引会退化成只剩全文检索。
 
 插件脚本路径在运行时解析：优先取 `~/.claude/plugins/cache/manyread/manyread/<最新版本>/scripts/` 下的脚本，找不到再回退到 marketplace 检出，因此插件升级换版本后仍然可用。
+
+## manyread-grounding.mjs —— 防漂变核对（阻塞）
+
+回合结束时运行，只在已建索引的项目里生效。它扫描本回合的工具使用记录，全程不调用模型：如果这一回合改动了代码，或者多次直接读取、grep 了文件，却全程没有用过 manyread，就打断一次，提醒先用 manyread 核对相关符号、依赖与结构的真实状态再结束。它的目的是防止因为很少查 manyread 而让理解与真实代码逐渐脱节。
+
+因为判断是确定性的，所以几乎不会误伤：没有动项目代码的回合、或者已经用过 manyread 的回合都会直接放行；同一回合最多提醒一次，提醒过仍未照做也会放行，不会卡住。
