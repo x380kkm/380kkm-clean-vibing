@@ -1,0 +1,78 @@
+{
+  "permissions": {
+    "defaultMode": "bypassPermissions"
+  },
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["C:\\Users\\380kk\\.claude\\hooks\\session-start-reminders.mjs"],
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["C:\\Users\\380kk\\.claude\\hooks\\stop-reminders.mjs"],
+            "timeout": 15
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["C:\\Users\\380kk\\.claude\\hooks\\style-audit.mjs"],
+            "timeout": 200,
+            "statusMessage": "文风审计中…"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["C:\\Users\\380kk\\.claude\\hooks\\manyread-rebuild.mjs"],
+            "timeout": 300,
+            "async": true,
+            "statusMessage": "重建 manyread 索引…"
+          }
+        ]
+      }
+    ]
+  },
+  "enableWorkflows": true,
+  "enabledPlugins": {
+    "manyread@manyread": true
+  },
+  "extraKnownMarketplaces": {
+    "manyread": {
+      "source": {
+        "source": "github",
+        "repo": "x380kkm/manyread-cc"
+      }
+    }
+  },
+  "ultracode": true,
+  "autoUpdatesChannel": "latest",
+  "tui": "fullscreen",
+  "skipDangerousModePermissionPrompt": true,
+  "theme": "dark",
+  "remoteControlAtStartup": true,
+  "skipAutoPermissionPrompt": true,
+  "model": "claude-fable-5[1m]"
+}
