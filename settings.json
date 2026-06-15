@@ -13,7 +13,9 @@
           {
             "type": "command",
             "command": "node",
-            "args": ["C:\\Users\\380kk\\.claude\\hooks\\session-start-reminders.mjs"],
+            "args": [
+              "C:\\Users\\380kk\\.claude\\hooks\\session-start-reminders.mjs"
+            ],
             "timeout": 15
           }
         ]
@@ -25,7 +27,9 @@
           {
             "type": "command",
             "command": "node",
-            "args": ["C:\\Users\\380kk\\.claude\\hooks\\stop-reminders.mjs"],
+            "args": [
+              "C:\\Users\\380kk\\.claude\\hooks\\stop-reminders.mjs"
+            ],
             "timeout": 15
           }
         ]
@@ -35,7 +39,9 @@
           {
             "type": "command",
             "command": "node",
-            "args": ["C:\\Users\\380kk\\.claude\\hooks\\style-audit.mjs"],
+            "args": [
+              "C:\\Users\\380kk\\.claude\\hooks\\style-audit.mjs"
+            ],
             "timeout": 200,
             "statusMessage": "文风审计中…"
           }
@@ -46,7 +52,48 @@
           {
             "type": "command",
             "command": "node",
-            "args": ["C:\\Users\\380kk\\.claude\\hooks\\manyread-rebuild.mjs"],
+            "args": [
+              "C:\\Users\\380kk\\.claude\\hooks\\comment-test-probe.mjs"
+            ],
+            "timeout": 200,
+            "statusMessage": "注释一致性测试中…"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "C:\\Users\\380kk\\.claude\\hooks\\jargon-audit.mjs"
+            ],
+            "timeout": 120,
+            "statusMessage": "黑话审计中…"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "C:\\Users\\380kk\\.claude\\hooks\\doc-sync-audit.mjs"
+            ],
+            "timeout": 120,
+            "statusMessage": "文档同步核对…"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "C:\\Users\\380kk\\.claude\\hooks\\manyread-rebuild.mjs"
+            ],
             "timeout": 300,
             "async": true,
             "statusMessage": "重建 manyread 索引…"
@@ -58,7 +105,9 @@
           {
             "type": "command",
             "command": "node",
-            "args": ["C:\\Users\\380kk\\.claude\\hooks\\manyread-grounding.mjs"],
+            "args": [
+              "C:\\Users\\380kk\\.claude\\hooks\\manyread-grounding.mjs"
+            ],
             "timeout": 30,
             "statusMessage": "manyread 核对…"
           }
