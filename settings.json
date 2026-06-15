@@ -113,6 +113,20 @@
           }
         ]
       }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "C:\\Users\\380kk\\.claude\\hooks\\intent-drift-context.mjs"
+            ],
+            "timeout": 10
+          }
+        ]
+      }
     ]
   },
   "enableWorkflows": true,
