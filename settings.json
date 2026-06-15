@@ -106,10 +106,10 @@
             "type": "command",
             "command": "node",
             "args": [
-              "C:\\Users\\380kk\\.claude\\hooks\\manyread-grounding.mjs"
+              "C:\\Users\\380kk\\.claude\\hooks\\drift-compact.mjs"
             ],
-            "timeout": 30,
-            "statusMessage": "manyread 核对…"
+            "timeout": 140,
+            "statusMessage": "维护会话回顾…"
           }
         ]
       }
@@ -121,7 +121,7 @@
             "type": "command",
             "command": "node",
             "args": [
-              "C:\\Users\\380kk\\.claude\\hooks\\intent-drift-context.mjs"
+              "C:\\Users\\380kk\\.claude\\hooks\\drift-record.mjs"
             ],
             "timeout": 10
           }
