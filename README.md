@@ -5,3 +5,5 @@
 迁移到本机只改一处：把 `settings.json` 里各 hook 的绝对路径换成本机路径。
 
 运行前提：`uv`、`git`、Node.js。命令清单见 `skills/clean-tools/SKILL.md`。
+
+灵感来源 https://github.com/IOchair/SQL-ManyThing
