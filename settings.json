@@ -116,17 +116,6 @@
     ]
   },
   "enableWorkflows": true,
-  "enabledPlugins": {
-    "manyread@manyread": true
-  },
-  "extraKnownMarketplaces": {
-    "manyread": {
-      "source": {
-        "source": "github",
-        "repo": "x380kkm/manyread-cc"
-      }
-    }
-  },
   "ultracode": true,
   "autoUpdatesChannel": "latest",
   "tui": "fullscreen",
