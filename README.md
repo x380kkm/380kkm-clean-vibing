@@ -8,4 +8,4 @@
 
 灵感与初版来源 https://github.com/IOchair/SQL-ManyThing
 
-初版：
+初版：https://github.com/x380kkm/manyread-cc
