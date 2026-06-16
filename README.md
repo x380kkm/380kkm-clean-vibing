@@ -6,4 +6,6 @@
 
 运行前提：`uv`、`git`、Node.js。命令清单见 `skills/clean-tools/SKILL.md`。
 
-灵感来源 https://github.com/IOchair/SQL-ManyThing
+灵感与初版来源 https://github.com/IOchair/SQL-ManyThing
+
+初版：
