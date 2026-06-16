@@ -2,7 +2,7 @@
 // # style-audit-hook
 // 阻塞型 Stop hook：把本回合最终回复落到 archive/，再用一个独立的、无项目上下文的
 // claude 进程按平直语言标准审计；不通过就 block，把审计意见反馈给主 agent 改写重交。
-// 运行前提：PATH 上有 claude CLI；审计进程用默认模型（用户默认即最好模型）。
+// 运行前提：PATH 上有 claude CLI；审计进程用默认模型（用户配置的默认模型）。
 // 不变量一：审计器报错/超时/无法解析一律放行（fail-open），绝不因审计器坏掉而卡死会话。
 // 不变量二：审计自身起的 claude 进程带 CLAUDE_HOOK_NESTED=1，本脚本见到即放行，断开递归。
 // 不变量三：同一回复最多打断 MAX_BLOCKS 次，超出则放行并告警，防 block 死循环。
@@ -12,7 +12,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 
-const MIN_CHARS = 280;   // 短于此的回复（状态行、一句话汇报）跳过审计，省时省钱
+const MIN_CHARS = 280;   // 短于此的回复（状态行、一句话汇报）跳过审计，减少不必要的调用开销
 const MAX_BLOCKS = 2;    // 同一回复最多打断重写次数
 
 // 输出一段 hook JSON 并按放行退出。
@@ -62,7 +62,7 @@ try {
   const dir = path.join(cwd, "archive");
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, "style-audit.md"), text, "utf8");
-} catch { /* 落盘失败不阻断审计 */ }
+} catch { /* 写入失败时不阻断后续审计流程 */ }
 // //// /落临时文档到 archive/ ////
 
 // //// 重试计数（防 block 死循环） [@380kkm 2026-06-13] ////

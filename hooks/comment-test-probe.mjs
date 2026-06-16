@@ -1,16 +1,17 @@
 // audience: internal
 // # comment-test-probe-hook
 // 阻塞型 Stop hook：验证本回合改动的代码与其注释是否一致。
-// 把注释当规格，起一个独立 claude 进程设计并执行一次性单元测试；测后即弃，不污染项目测试套件。
+// 把注释当规格，启动一个独立 claude 进程设计并执行一次性单元测试；测后即弃，不纳入项目正式测试套件。
 // 运行前提：PATH 上有 claude CLI；被测项目可在 cwd 下正常调用。
 // 不变量一：嵌套 claude 进程（CLAUDE_HOOK_NESTED=1）直接放行，断开递归。
-// 不变量二：验证器报错/超时/无法解析一律放行（fail-open），绝不因验证器自身故障卡死会话。
+// 不变量二：验证器报错、超时或无法解析时一律放行（fail-open），绝不因验证器自身故障卡死会话。
 // 不变量三：同一回合最多打断 MAX_BLOCKS 次，超出就放行，防止 block 死循环。
 
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import { planDimension, boundedContext } from "./lib/cleanaudit-bridge.mjs";
 
 const MAX_BLOCKS = 1;    // 每条回复最多 block 一次
 
@@ -72,21 +73,33 @@ const untrackedFiles = statusOut
 const allChanged = [...new Set([...diffFiles, ...untrackedFiles])];
 const srcFiles = allChanged.filter(isSrcFile);
 
-// 筛完没有源码改动直接放行，不起 claude
+// 没有源码改动则直接放行，不启动 claude 进程
 if (srcFiles.length === 0) allow();
 // //// /用 git 取本回合改动的源码文件列表 ////
 
-// //// 取 git diff 文本作为验证上下文 [@380kkm 2026-06-15] ////
-const diffTextRes = spawnSync("git", ["diff", "HEAD", "--", ...srcFiles], {
-  cwd,
-  encoding: "utf8",
-  timeout: 15000,
-  maxBuffer: 8 * 1024 * 1024,
-});
-const diffText = (diffTextRes.status === 0 && !diffTextRes.error)
-  ? (diffTextRes.stdout || "")
-  : "";
-// //// /取 git diff 文本作为验证上下文 ////
+// //// cleanaudit 预过滤：本回合无改动符号则跳过，不启动 claude 进程设计并运行测试 [@380kkm 2026-06-16] ////
+if (planDimension("comment", cwd) === "skip") allow();
+// //// /cleanaudit 预过滤 ////
+
+// //// 取验证上下文：优先用 cleanaudit 改动符号的有界片段，取不到则回退到完整 git diff [@380kkm 2026-06-16] ////
+// 注释一致性验证的目标是「函数现在是否做到注释所说」，需要符号的完整当前源码而非改动增量，
+// 故优先用 cleanaudit context（只含被改符号、完整且有界），取不到再回退整份 diff。
+const bounded = boundedContext("comment", cwd);
+let auditMaterial, materialLabel;
+if (bounded) {
+  auditMaterial = bounded;
+  materialLabel = "改动符号的完整源码（有界）";
+} else {
+  const diffTextRes = spawnSync("git", ["diff", "HEAD", "--", ...srcFiles], {
+    cwd,
+    encoding: "utf8",
+    timeout: 15000,
+    maxBuffer: 8 * 1024 * 1024,
+  });
+  auditMaterial = (diffTextRes.status === 0 && !diffTextRes.error) ? (diffTextRes.stdout || "") : "";
+  materialLabel = "git diff";
+}
+// //// /取验证上下文 ////
 
 // //// 重试计数（防 block 死循环） [@380kkm 2026-06-15] ////
 const countFile = path.join(os.tmpdir(), `claude-cmt-probe-${sessionId}.count`);
@@ -98,11 +111,11 @@ const setCount = (n) => {
 };
 // //// /重试计数（防 block 死循环） ////
 
-// //// 组装 rubric 与验证上下文 [@380kkm 2026-06-15] ////
+// //// 组装验证提示词与验证上下文 [@380kkm 2026-06-15] ////
 const RUBRIC = `你是独立的代码-注释一致性验证器。
 
 工作规程：
-1. 阅读下方改动文件列表与 git diff，找出所有已注释的代码单元（函数、方法、类、模块）。
+1. 阅读下方改动文件列表与改动单元的源码，找出所有已注释的代码单元（函数、方法、类、模块）。
 2. 对每个能被单独执行、副作用可控的单元，把其注释当作规格，设计最小单元测试；测试当且仅当代码确实做到注释所说时通过。
 3. 把测试文件写到项目根目录下的 archive/ 子目录（若不存在则创建），文件名任意；跑完立即视为一次性产物，不将其纳入项目正式测试套件，不修改任何项目源码。
 4. 运行测试，收集结果。
@@ -116,11 +129,11 @@ const RUBRIC = `你是独立的代码-注释一致性验证器。
 ====== 改动源码文件列表 ======
 ${srcFiles.join("\n")}
 
-====== git diff ======
-${diffText || "（diff 为空或无法获取）"}`;
-// //// /组装 rubric 与验证上下文 ////
+====== ${materialLabel} ======
+${auditMaterial || "（上下文为空或无法获取）"}`;
+// //// /组装验证提示词与验证上下文 ////
 
-// //// 起独立 claude 验证，解析裁决 [@380kkm 2026-06-15] ////
+// //// 启动独立 claude 进程验证，解析判定结果 [@380kkm 2026-06-15] ////
 let verdict = null;
 const res = spawnSync("claude -p", {
   input: RUBRIC,
@@ -138,9 +151,9 @@ if (res.status === 0 && !res.error && res.stdout) {
     try { verdict = JSON.parse(m[0]); } catch { verdict = null; }
   }
 }
-// //// /起独立 claude 验证，解析裁决 ////
+// //// /启动独立 claude 进程验证，解析判定结果 ////
 
-// //// 留痕：把裁决写到 archive/comment-test-probe.md [@380kkm 2026-06-15] ////
+// //// 记录判定结果到 archive/comment-test-probe.md [@380kkm 2026-06-15] ////
 try {
   const archiveDir = path.join(cwd, "archive");
   fs.mkdirSync(archiveDir, { recursive: true });
@@ -163,11 +176,11 @@ try {
     mismatches,
   ].join("\n");
   fs.writeFileSync(path.join(archiveDir, "comment-test-probe.md"), record, "utf8");
-} catch { /* 留痕失败不阻断主流程 */ }
-// //// /留痕：把裁决写到 archive/comment-test-probe.md ////
+} catch { /* 记录失败不阻断主流程 */ }
+// //// /记录判定结果到 archive/comment-test-probe.md ////
 
-// //// 据裁决决定放行或打断 [@380kkm 2026-06-15] ////
-// 解析失败、claude 报错、超时、pass 非布尔一律 fail-open
+// //// 据判定结果决定放行或打断 [@380kkm 2026-06-15] ////
+// 解析失败、claude 报错、超时、pass 非布尔时，一律 fail-open 放行。
 if (!verdict || typeof verdict.pass !== "boolean") {
   setCount(0);
   allow({ systemMessage: "代码-注释一致性验证未能运行或返回无法解析，本次已放行。" });
@@ -201,4 +214,4 @@ process.stdout.write(JSON.stringify({
   reason: `代码与注释存在矛盾（第 ${n}/${MAX_BLOCKS} 次打断），请修正代码或注释使二者一致后重新提交：\n${mismatchLines}`,
 }));
 process.exit(0);
-// //// /据裁决决定放行或打断 ////
+// //// /据判定结果决定放行或打断 ////

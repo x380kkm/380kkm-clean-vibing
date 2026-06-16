@@ -1,8 +1,8 @@
 // audience: internal
 // # drift-record-hook
-// UserPromptSubmit hook：把用户这次请求追加进会话状态文件（攒「要求了什么」），
-// 并把上一回合末由 drift-compact 备好的回顾摘要注入上下文。只做轻活——记录加读取注入，
-// 不压缩、不判断、不扫描；重活都在回合末的 drift-compact 里。
+// UserPromptSubmit hook：把用户这次请求追加进会话状态文件（积累历史请求记录），
+// 并把上一回合末由 drift-compact 备好的回顾摘要注入上下文。只做记录与读取注入，
+// 不压缩、不判断、不扫描；压缩与判断均在回合末的 drift-compact 里。
 // 不变量一：嵌套 claude 进程（CLAUDE_HOOK_NESTED=1）直接退出，断开递归。
 // 不变量二：读写状态文件失败一律静默退出，绝不阻断提交。
 

@@ -12,6 +12,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import { planDimension } from "./lib/cleanaudit-bridge.mjs";
 
 const MAX_BLOCKS = 1;
 
@@ -22,7 +23,7 @@ const SOURCE_EXTS = new Set([
   ".cs", ".rb", ".swift", ".kt", ".scala", ".sh", ".bash",
 ]);
 
-// 输出一段 hook JSON 并按放行退出。
+// 向 stdout 输出 hook JSON 并以放行状态退出。
 function allow(extra) {
   process.stdout.write(JSON.stringify(extra ?? {}));
   process.exit(0);
@@ -65,6 +66,10 @@ function getChangedSourceFiles(dir) {
 const sourceFiles = getChangedSourceFiles(cwd);
 if (!sourceFiles || sourceFiles.length === 0) allow();   // git 失败或无源码改动
 // //// /用 git 取本回合改动的源码文件列表 ////
+
+// //// cleanaudit 预过滤：本回合无改动符号则跳过，省去模型调用 [@380kkm 2026-06-16] ////
+if (planDimension("jargon", cwd) === "skip") allow();
+// //// /cleanaudit 预过滤 ////
 
 // //// 组装 diff 内容：已跟踪文件取 diff，未跟踪文件取全文 [@380kkm 2026-06-15] ////
 function buildDiff(dir, files) {
@@ -112,7 +117,7 @@ try {
     `# jargon-audit diff\n\ncwd: ${cwd}\nsession: ${sessionId}\ndate: ${new Date().toISOString()}\n\n\`\`\`\n${diff}\n\`\`\`\n`,
     "utf8",
   );
-} catch { /* 落盘失败不阻断审计 */ }
+} catch { /* 写文件失败不阻断审计 */ }
 // //// /留痕：把 diff 写到 archive/jargon-audit.md ////
 
 // //// MAX_BLOCKS 计数：读写 tmpdir 计数文件 [@380kkm 2026-06-15] ////
@@ -147,8 +152,8 @@ let verdict = null;
 const res = spawnSync("claude -p", {
   input: `${RUBRIC}\n\n====== diff 内容 ======\n${diff}`,
   shell: true,
-  cwd: os.tmpdir(),                                        // 隔离：临时目录，无项目上下文
-  env: { ...process.env, CLAUDE_HOOK_NESTED: "1" },        // 标记嵌套，避免递归审计
+  cwd: os.tmpdir(),                                        // 在临时目录运行，与当前项目隔离，避免引入项目上下文
+  env: { ...process.env, CLAUDE_HOOK_NESTED: "1" },        // 设置嵌套标记，防止递归触发审计
   encoding: "utf8",
   timeout: 100000,
   maxBuffer: 16 * 1024 * 1024,
@@ -157,7 +162,7 @@ if (res.status === 0 && !res.error && res.stdout) {
   const m = res.stdout.match(/\{[\s\S]*\}/);
   if (m) { try { verdict = JSON.parse(m[0]); } catch { verdict = null; } }
 }
-// 解析失败/报错/超时/pass 非布尔：fail-open 放行
+// 解析失败、报错、超时或 pass 非布尔值时，一律放行（审计器出错不阻断会话）
 if (!verdict || typeof verdict.pass !== "boolean") {
   setCount(0);
   allow({ systemMessage: "黑话审计未能运行或返回无法解析，本次已放行。" });

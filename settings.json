@@ -92,20 +92,6 @@
             "type": "command",
             "command": "node",
             "args": [
-              "C:\\Users\\380kk\\.claude\\hooks\\manyread-rebuild.mjs"
-            ],
-            "timeout": 300,
-            "async": true,
-            "statusMessage": "重建 manyread 索引…"
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node",
-            "args": [
               "C:\\Users\\380kk\\.claude\\hooks\\drift-compact.mjs"
             ],
             "timeout": 140,

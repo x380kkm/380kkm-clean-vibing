@@ -1,0 +1,14 @@
+# Python 缓存与字节码
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# 测试不随安装分发
+tools/**/tests/
+tools/cleanread/cleanscan/selftest.py
+
+# 索引数据库等构建产物
+*.db
+
+# 临时草稿
+archive/
