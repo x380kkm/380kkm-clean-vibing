@@ -36,9 +36,10 @@ class Zoning:
     dep_roots: tuple[str, ...] = ()
 
 
-#### 规范化根路径：归一斜杠、去前导 ./、去尾部 / [@380kkm 2026-06-05] ####
+#### 规范化根路径：归一斜杠、去前导 ./、去尾部 /，单独的 . 归一为空（整仓） [@380kkm 2026-06-17] ####
 def norm_root(p: str) -> str:
-    return _NORM(p or "").rstrip("/")
+    r = _NORM(p or "").rstrip("/")
+    return "" if r == "." else r
 
 
 #### 自动探测目标根：最短的模块根（*.uplugin、*.Build.cs 等） [@380kkm 2026-06-05] ####

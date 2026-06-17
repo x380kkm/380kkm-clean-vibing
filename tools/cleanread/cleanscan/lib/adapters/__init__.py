@@ -60,7 +60,7 @@ class CodeAdapter:
         seed = seed.strip()
         out: dict[str, Node] = {}
         norm = "replace(path, char(92), '/')"
-        s = seed.replace("\\", "/").lstrip("./")
+        s = seed.replace("\\", "/").removeprefix("./")
         rows = store.conn.execute(
             f"SELECT id, path FROM files WHERE {norm} = ? OR {norm} LIKE ? "
             "ORDER BY length(path) LIMIT ?",

@@ -144,7 +144,7 @@ class PathIndex:
     #### 归一化候选路径：反斜杠转 '/' 并去掉前导 './' [@380kkm 2026-06-05] ####
     @staticmethod
     def _norm(c: str) -> str:
-        return c.replace("\\", "/").lstrip("./")
+        return c.replace("\\", "/").removeprefix("./")
 
     #### 按精确、后缀、基名顺序匹配候选，返回 file_id 或 None [@380kkm 2026-06-05] ####
     def match(self, candidates: list[str], *, suffix: bool = False,

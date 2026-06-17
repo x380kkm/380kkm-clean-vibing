@@ -55,7 +55,7 @@
             "args": [
               "C:\\Users\\380kk\\.claude\\hooks\\comment-test-probe.mjs"
             ],
-            "timeout": 200,
+            "timeout": 360,
             "statusMessage": "注释一致性测试中…"
           }
         ]
@@ -68,7 +68,7 @@
             "args": [
               "C:\\Users\\380kk\\.claude\\hooks\\jargon-audit.mjs"
             ],
-            "timeout": 120,
+            "timeout": 240,
             "statusMessage": "黑话审计中…"
           }
         ]
@@ -81,7 +81,7 @@
             "args": [
               "C:\\Users\\380kk\\.claude\\hooks\\doc-sync-audit.mjs"
             ],
-            "timeout": 120,
+            "timeout": 240,
             "statusMessage": "文档同步核对…"
           }
         ]

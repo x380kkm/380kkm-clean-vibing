@@ -168,7 +168,9 @@ def _action_rename(row, rule, content_by_file_id) -> bool:
     if content is None:
         return False
     start = row.get("start_byte") or 0
-    window = content[start:start + _SLICE_WINDOW]
+    # start_byte 是 UTF-8 字节偏移，content 按字符索引；按字节切片再解码，避免符号前有多字节字符时窗口错位
+    raw = content.encode("utf-8")
+    window = raw[start:start + _SLICE_WINDOW].decode("utf-8", "replace")
 
     pos = 0
     skip_re_src = rule.get("skip_token_regex")
