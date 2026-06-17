@@ -178,12 +178,17 @@ when refactoring.
   starts (`index_build --incremental` then `enrich_treesitter --files`) and
   rebuilds it fully (`index_build` then `enrich_treesitter`) once it closes;
   a turn-level audit uses the throwaway parse, never the index.
-- Every agent, main and sub, reads through cleanread: cleanscan locates a
-  `path:line`, then cleanread pulls that byte span; no agent Reads a whole
-  file or scans with ls/grep.
+- Reuse before re-search: every agent opens with `trace preflight` to reuse
+  the locating queries earlier agents logged — queries run without --no-log
+  so they accumulate, and a hit skips the re-locating. The rule is reuse, not
+  bounded retrieval: once an agent has located (or when reuse misses) it
+  freely picks grep/Read.
 - Before fanning out, a read-only scout subagent (`cleantools-scout`, holding
-  only cleanread and cleanscan) emits a `path:line` anchor map; each fan-out
-  agent receives the anchors and the bounded-retrieval rule in its prompt and
-  extracts spans instead of re-reading files.
+  only cleanread and cleanscan) explores, logs its locating queries to trace,
+  and emits a `path:line` anchor map for downstream reuse.
+- The scout carries an escape hatch: on a diverging target (dependency
+  tracing and the like) where bounded retrieval will not converge, it stops,
+  returns the anchors it has, and marks the area unexplored — the main agent
+  hands that part to a normal full-tool agent that freely greps/Reads.
 - A subtask that writes, runs commands, or reads unindexed content uses a
-  normal full-tool agent; bounded-read subtasks consume the scout output.
+  normal full-tool agent.
