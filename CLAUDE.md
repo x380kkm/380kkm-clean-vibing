@@ -165,3 +165,25 @@ when refactoring.
 - A function is done when its algorithm is understood and its boundaries
   hold; tests verify the algorithm, the algorithm is never bent to satisfy
   a test — no symptom-patching ifs, no silenced checks.
+
+# Agent Orchestration
+
+- A substantive modification task runs as a Workflow; trivial or
+  conversational turns run solo.
+- Agents use model `opus` (`fable` is currently unavailable); audit agents
+  diagnose only, never edit.
+- A failed audit loops to a fix round, then re-audit, until clean or the
+  round cap hits.
+- A read-or-trace task refreshes the cleanread index incrementally before it
+  starts (`index_build --incremental` then `enrich_treesitter --files`) and
+  rebuilds it fully (`index_build` then `enrich_treesitter`) once it closes;
+  a turn-level audit uses the throwaway parse, never the index.
+- Every agent, main and sub, reads through cleanread: cleanscan locates a
+  `path:line`, then cleanread pulls that byte span; no agent Reads a whole
+  file or scans with ls/grep.
+- Before fanning out, a read-only scout subagent (`cleantools-scout`, holding
+  only cleanread and cleanscan) emits a `path:line` anchor map; each fan-out
+  agent receives the anchors and the bounded-retrieval rule in its prompt and
+  extracts spans instead of re-reading files.
+- A subtask that writes, runs commands, or reads unindexed content uses a
+  normal full-tool agent; bounded-read subtasks consume the scout output.
