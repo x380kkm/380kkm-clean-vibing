@@ -11,6 +11,7 @@
 """
 from __future__ import annotations
 
+import datetime
 import json
 import re
 import shutil
@@ -21,8 +22,8 @@ from pathlib import Path
 
 from . import config
 
-#### 固定构建日期 [@380kkm 2026-06-05] ####
-REF_DATE = "2026-05-28"
+#### 当天日期，用作 ref id 与清单 date 字段的前缀 [@380kkm 2026-06-17] ####
+REF_DATE = datetime.date.today().isoformat()
 
 
 #### 把自由格式任务串转成文件系统安全的 slug [@380kkm 2026-06-05] ####
