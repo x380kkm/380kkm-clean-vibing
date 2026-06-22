@@ -11,6 +11,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import { resolveMode } from "./lib/style-mode.mjs";
 
 const MIN_CHARS = 280;   // 短于此的回复（状态行、一句话汇报）跳过审计，减少不必要的调用开销
 const MAX_BLOCKS = 2;    // 同一回复最多打断重写次数
@@ -32,6 +33,10 @@ const transcript = input.transcript_path;
 const sessionId = input.session_id || "nosession";
 const cwd = input.cwd || process.cwd();
 // //// /读取 Stop hook 输入 ////
+
+// //// A/B 模式闸：inject 模式由 style-rewrite-inject 接管，本阻塞审计让位放行 [@380kkm 2026-06-22] ////
+if (resolveMode(cwd) !== "block") allow();
+// //// /A/B 模式闸 ////
 
 // //// 从转写里取最后一条 assistant 文本 [@380kkm 2026-06-13] ////
 function lastAssistantText(tp) {

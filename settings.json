@@ -98,6 +98,19 @@
             "statusMessage": "维护会话回顾…"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "C:\\Users\\380kk\\.claude\\hooks\\style-rewrite-inject.mjs"
+            ],
+            "timeout": 600,
+            "statusMessage": "文风改写流水线…"
+          }
+        ]
       }
     ],
     "UserPromptSubmit": [
