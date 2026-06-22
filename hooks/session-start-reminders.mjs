@@ -6,7 +6,7 @@
 
 import { composeInjection } from "./lib/claude-md.mjs";
 
-//// 从 CLAUDE.md 组装 presession 场景注入文本（场景块加去重后的 plain）；为空则不注 [@380kkm 2026-06-22] ////
+//// 从 CLAUDE.md 组装 presession 场景注入文本（场景块加去重后的 plain）；为空则不注入 [@380kkm 2026-06-22] ////
 const ctx = composeInjection("presession");
 const out = ctx
   ? { hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: ctx } }

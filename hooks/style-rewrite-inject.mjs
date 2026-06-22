@@ -19,10 +19,10 @@ const MIN_CHARS = 280;
 const SUBCALL_TIMEOUT = 90000;
 // 等转写落盘的最长时间
 const WAIT_MS = 3000;
-// 轮询间隔
+// 两次轮询之间的等待时间
 const POLL_MS = 150;
 
-//// 从 CLAUDE.md 的 plain 块取平直语言标准，读不到用兜底 [@380kkm 2026-06-22] ////
+//// 从 CLAUDE.md 的 plain 块取平直语言标准，读不到时用内置默认值 [@380kkm 2026-06-22] ////
 const PLAIN_CRITERIA = extractBlocks("plain") ||
   "完整句子，不用电报体或碎片短语，不堆砌缩写，新造代号首次出现给半句解释；没有翻译腔与营销词；中文用全角标点，中文与英文或数字之间留一个空格。";
 //// /取平直语言标准 ////

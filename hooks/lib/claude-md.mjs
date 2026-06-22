@@ -1,9 +1,9 @@
 // audience: internal
 // # claude-md
 // 从用户级 CLAUDE.md 按场景标记块抽取内容，供各提醒钩子共用，使 CLAUDE.md 成为单一事实源。
-// 一个标记是一对 <!-- tag:start --> 与 <!-- tag:end --> 注释；同名标记可有多块，全部拼接。抽取时剥掉
+// 一个标记是一对 <!-- tag:start --> 与 <!-- tag:end --> 注释；同名标记可有多块，全部拼接。抽取时删去
 // 块内嵌套的标记注释，使重叠标记（如 plain 嵌在 precode 内）的标记文本不进入输出。
-// composeInjection 先按嵌套 plain 标记的起止位置，把场景块里的 plain 连同它的标记一起删掉，再在末尾附一份 plain。
+// composeInjection 先按嵌套 plain 标记的起止位置，把场景块里的 plain 连同它的标记一起删去，再在末尾附一份 plain。
 // 用 os.homedir() 定位 CLAUDE.md，不含机器特定路径。读不到或无该标记时返回空串，由调用方决定是否跳过。
 
 import fs from "node:fs";
@@ -20,7 +20,7 @@ function readClaudeMd() {
 }
 //// /读用户级 CLAUDE.md ////
 
-//// 取某标记下所有块的正文、去掉 CRLF；不剥嵌套标记，无则返回空数组 [@380kkm 2026-06-22] ////
+//// 取某标记下所有块的正文、去掉 CRLF；不删嵌套标记，无则返回空数组 [@380kkm 2026-06-22] ////
 function rawBodies(tag) {
   const md = readClaudeMd();
   if (!md) return [];
@@ -29,13 +29,13 @@ function rawBodies(tag) {
 }
 //// /取某标记下所有块的正文 ////
 
-//// 剥掉一段正文里所有剩余标记注释、折叠空行、去首尾空白 [@380kkm 2026-06-22] ////
+//// 删去一段正文里所有剩余标记注释、折叠空行、去首尾空白 [@380kkm 2026-06-22] ////
 function clean(text) {
   return text.replace(/<!--[\s\S]*?-->/g, "").replace(/\n{3,}/g, "\n\n").trim();
 }
-//// /剥标记并清洗 ////
+//// /删标记并清洗 ////
 
-//// 把文本里某个嵌套标记从起标记到止标记的整段，连同紧跟的一个换行，一起删掉 [@380kkm 2026-06-22] ////
+//// 把文本里某个嵌套标记从起标记到止标记的整段，连同紧跟的一个换行，一起删去 [@380kkm 2026-06-22] ////
 function dropNested(text, nestedTag) {
   const re = new RegExp(`<!--\\s*${nestedTag}:start\\s*-->[\\s\\S]*?<!--\\s*${nestedTag}:end\\s*-->\\n?`, "g");
   return text.replace(re, "");
@@ -48,7 +48,7 @@ export function extractBlocks(tag) {
 }
 //// /拼接某标记下所有块 ////
 
-//// 组装某场景的注入文本：先删掉场景块里嵌套的 plain 并清洗，再在末尾附一份 plain；两者都空就返回空串 [@380kkm 2026-06-22] ////
+//// 组装某场景的注入文本：先删去场景块里嵌套的 plain 并清洗，再在末尾附一份 plain；两者都空就返回空串 [@380kkm 2026-06-22] ////
 export function composeInjection(tag) {
   const scenario = rawBodies(tag).map((body) => clean(dropNested(body, "plain"))).filter(Boolean).join("\n\n");
   const plain = extractBlocks("plain");

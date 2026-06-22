@@ -1,8 +1,8 @@
 // audience: internal
 // # preread-reminder
 // 用户级 PreToolUse hook（匹配 Read、Grep）：读码前从 CLAUDE.md 注入 preread 块（用 cleanread 读、索引
-// 生命周期、reuse）外加 plain 块。索引「何时重建」与「怎么用」分开：用与读前刷新归 preread，收尾全量
-// 重建归 stop-reminders。按 session 记时间戳节流。内容全部来自 CLAUDE.md，读不到则不注入。
+// 生命周期、reuse）外加 plain 块。索引的怎么用和读前刷新由 preread 注入，收尾的全量重建由 stop-reminders
+// 负责。按 session 记时间戳节流。内容全部来自 CLAUDE.md，读不到则不注入。
 
 import fs from "node:fs";
 import os from "node:os";
@@ -25,7 +25,7 @@ try { input = JSON.parse(fs.readFileSync(0, "utf8") || "{}"); } catch { input = 
 const sessionId = input.session_id || "nosession";
 //// /读 PreToolUse 输入 ////
 
-//// 从 CLAUDE.md 组装 preread 场景注入文本（场景块加去重后的 plain）；为空则不注 [@380kkm 2026-06-22] ////
+//// 从 CLAUDE.md 组装 preread 场景注入文本（场景块加去重后的 plain）；为空则不注入 [@380kkm 2026-06-22] ////
 const ctx = composeInjection("preread");
 if (!ctx) emit({});
 //// /取注入内容 ////
