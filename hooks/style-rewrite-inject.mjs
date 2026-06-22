@@ -4,9 +4,11 @@
 // 再经 hookSpecificOutput.additionalContext 注入主 agent 并要求复述，使用户看到干净版、主 agent 也
 // 获得一条干净样例以减少后续风格漂移。流水线固定为：改写、审计、改写、审计、改写，取终稿。短上下文的
 // 改写与审计 claude 进程不漂移，质量高于长上下文里主 agent 自改。运行前提：PATH 上有 claude CLI，用默认模型。
+// 取本回合文本前先等转写落盘：钩子可能在触发停止的最新一条 assistant 文本写进转写之前就运行，直接读会
+// 读到上一条；故先轮询，等当前回合的 assistant 文本出现（排在最后一条 user 记录之后）且不再增长，再取它。
 // 不变量一：嵌套 claude 进程（CLAUDE_HOOK_NESTED=1）直接放行，断开递归。
 // 不变量二：stop_hook_active 为真表示本次停止由注入续写引发，直接放行，断开续写循环。
-// 不变量三：任一子调用失败、超时或无法解析时放行不注入，绝不因改写器坏掉卡死会话。
+// 不变量三：当前回合文本在等待窗口内始终未落盘，或任一子调用失败、超时、无法解析时放行不注入，绝不卡死会话。
 
 import fs from "node:fs";
 import os from "node:os";
@@ -14,6 +16,8 @@ import { spawnSync } from "node:child_process";
 
 const MIN_CHARS = 280;        // 短于此的回复跳过，减少不必要的流水线开销
 const SUBCALL_TIMEOUT = 90000;
+const WAIT_MS = 3000;         // 等转写落盘的最长时间
+const POLL_MS = 150;          // 轮询间隔
 
 const AUDIT_RUBRIC = `你是一个独立的中文写作风格审计器。只判断给定文本的"文风"，不评价其技术内容是否正确，也没有任何项目背景，不要试图理解项目。
 
@@ -55,29 +59,56 @@ const transcript = input.transcript_path;
 if (input.stop_hook_active) allow();
 //// /续写闸 ////
 
-//// 从转写取最后一条 assistant 文本；过短则跳过 [@380kkm 2026-06-22] ////
-function lastAssistantText(tp) {
-  if (!tp || !fs.existsSync(tp)) return "";
-  const lines = fs.readFileSync(tp, "utf8").split(/\r?\n/).filter(Boolean);
-  for (let i = lines.length - 1; i >= 0; i--) {
+//// 同步休眠，给转写落盘留时间 [@380kkm 2026-06-22] ////
+function sleepSync(ms) { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms); }
+//// /同步休眠 ////
+
+//// 读取转写为非空行数组 [@380kkm 2026-06-22] ////
+function readLines(tp) {
+  if (!tp || !fs.existsSync(tp)) return [];
+  return fs.readFileSync(tp, "utf8").split(/\r?\n/).filter(Boolean);
+}
+//// /读取转写为非空行数组 ////
+
+//// 扫描：最后一条 user 与最后一条带文本的 assistant 记录的下标，及该 assistant 文本 [@380kkm 2026-06-22] ////
+function scan(lines) {
+  let lastUser = -1, lastText = -1, text = "";
+  for (let i = 0; i < lines.length; i++) {
     let rec;
     try { rec = JSON.parse(lines[i]); } catch { continue; }
     const msg = rec.message || rec;
     const role = rec.type || msg.role;
+    if (role === "user") { lastUser = i; continue; }
     if (role !== "assistant") continue;
-    const content = msg.content;
-    if (Array.isArray(content)) {
-      const t = content.filter(b => b && b.type === "text").map(b => b.text).join("").trim();
-      if (t) return t;
-    } else if (typeof content === "string" && content.trim()) {
-      return content.trim();
-    }
+    const c = msg.content;
+    let t = "";
+    if (Array.isArray(c)) t = c.filter(b => b && b.type === "text").map(b => b.text).join("").trim();
+    else if (typeof c === "string") t = c.trim();
+    if (t) { lastText = i; text = t; }
   }
-  return "";
+  return { lastUser, lastText, text };
 }
-const original = lastAssistantText(transcript);
+//// /扫描转写 ////
+
+//// 等当前回合的 assistant 文本落盘后取它：先等它出现在最后一条 user 之后，再等转写整体停止增长 [@380kkm 2026-06-22] ////
+const start = Date.now();
+let cur = scan(readLines(transcript));
+while (cur.lastText < cur.lastUser && Date.now() - start < WAIT_MS) {
+  sleepSync(POLL_MS);
+  cur = scan(readLines(transcript));
+}
+if (cur.lastText < cur.lastUser) allow();   // 当前回合文本始终未落盘，宁可不注入也不复述过时内容
+let lines = readLines(transcript);
+let prevLen = lines.length, stable = 0;
+while (Date.now() - start < WAIT_MS) {
+  sleepSync(POLL_MS);
+  lines = readLines(transcript);
+  if (lines.length === prevLen) { if (++stable >= 2) break; }
+  else { stable = 0; prevLen = lines.length; }
+}
+const original = scan(lines).text;
 if (original.length < MIN_CHARS) allow();
-//// /从转写取最后一条 assistant 文本 ////
+//// /等当前回合文本落盘 ////
 
 //// 起一个隔离的、无项目上下文的 claude 子进程；失败返回 null [@380kkm 2026-06-22] ////
 function runClaude(prompt) {
