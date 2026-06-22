@@ -113,6 +113,34 @@
           }
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Read|Grep",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "C:\\Users\\380kk\\.claude\\hooks\\preread-reminder.mjs"
+            ],
+            "timeout": 15
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "C:\\Users\\380kk\\.claude\\hooks\\standards-reminder.mjs"
+            ],
+            "timeout": 15
+          }
+        ]
+      }
     ]
   },
   "enableWorkflows": true,

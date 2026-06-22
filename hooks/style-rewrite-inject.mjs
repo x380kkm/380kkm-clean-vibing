@@ -13,33 +13,35 @@
 import fs from "node:fs";
 import os from "node:os";
 import { spawnSync } from "node:child_process";
+import { extractBlocks } from "./lib/claude-md.mjs";
 
 const MIN_CHARS = 280;        // 短于此的回复跳过，减少不必要的流水线开销
 const SUBCALL_TIMEOUT = 90000;
 const WAIT_MS = 3000;         // 等转写落盘的最长时间
 const POLL_MS = 150;          // 轮询间隔
 
+// 平直语言标准从 CLAUDE.md 的 plain 块取，读不到时用兜底。
+const PLAIN_CRITERIA = extractBlocks("plain") ||
+  "完整句子，不用电报体或碎片短语，不堆砌缩写，新造代号首次出现给半句解释；没有翻译腔与营销词；中文用全角标点，中文与英文或数字之间留一个空格。";
+
 const AUDIT_RUBRIC = `你是一个独立的中文写作风格审计器。只判断给定文本的"文风"，不评价其技术内容是否正确，也没有任何项目背景，不要试图理解项目。
 
-判定标准（全部满足才算通过）：
-1. 平直：完整句子；不用电报体或碎片短语；不用箭头链（如 A → B → 失败）；不堆砌缩写；新造的代号或缩写在首次出现时必须有半句解释。
-2. 非过度简化：简洁不等于潦草，为了短而丢掉"读者据以行动所需的信息"算不通过；不要把完整推理压成无主语的碎句。
-3. 没有翻译腔，没有营销词。
-4. 中文用全角标点；中文与英文或数字之间留一个空格。
+判定标准（依据下列用户平直语言规范，全部满足才算通过）：
+${PLAIN_CRITERIA}
 
 只输出一个 JSON 对象，不要任何其它文字、不要代码块围栏：
 {"pass": true, "issues": []}
 或
 {"pass": false, "issues": ["具体问题，要可据以改写", "..."]}`;
 
-const REWRITE_RUBRIC = `你是一个独立的中文写作风格改写器。把给定文本改写成符合下列标准的版本，保持原意与全部信息不丢失，不增删技术内容：
-1. 平直：完整句子；不用电报体或碎片短语；不用箭头链；不堆砌缩写；新造的代号或缩写首次出现给半句解释。
-2. 非过度简化：保留读者据以行动所需的信息；不要把推理压成无主语碎句。
-3. 没有翻译腔，没有营销词。
-4. 中文用全角标点；中文与英文或数字之间留一个空格。
+const REWRITE_RUBRIC = `你是一个独立的中文写作风格改写器。把给定文本改写成符合下列标准的版本，保持原意与全部信息不丢失，不增删技术内容。
+
+标准（依据下列用户平直语言规范）：
+${PLAIN_CRITERIA}
+
 只输出改写后的正文，不要任何解释、不要代码块围栏。`;
 
-// 输出一段 hook JSON 并按放行退出。
+//// 输出一段 hook JSON 并按放行退出 ////
 function allow(extra) {
   process.stdout.write(JSON.stringify(extra ?? {}));
   process.exit(0);

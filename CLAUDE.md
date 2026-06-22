@@ -1,4 +1,7 @@
 # Writing Standards
+
+<!-- precode:start -->
+
 ## Naming
 
 - A name states what the thing is, does, and any side effect: `get_or_create_session()`.
@@ -20,8 +23,10 @@
 ## Comments
 
 - Identifiers English; comments, docstrings, commit prose Chinese.
+<!-- plain:start -->
 - Plain full sentences; no coined shorthand or metaphor terms — a needed
   new term gets a half-sentence gloss at first use.
+<!-- plain:end -->
 - Present tense, what the code does; intent, rationale, plans never.
 - Clean first, then comment.
 - Public-API docs follow the surrounding style.
@@ -116,6 +121,10 @@ when refactoring.
 - Build the simplest thing that works now; grow architecture incrementally;
   defer decisions until information arrives.
 
+<!-- precode:end -->
+
+<!-- predoc:start -->
+
 ## Admission
 
 - `README` (what-this-is, how-to-run) and this `CLAUDE.md` (how-to-act-here)
@@ -138,10 +147,12 @@ when refactoring.
   committed, assembled only from anchored sources — head blocks tagged
   `audience: external`, `//// ////` units, commit messages; a machine fact
   copies verbatim from its single home; a source gap halts extraction.
+<!-- plain:start -->
 - The Chinese view keeps English identifiers and established terms in
   backticks; one fact, one active sentence; full-width Chinese marks, one
   space between Chinese and Latin runs: 重试 3 次后调用 `retry()`。
   Translationese and marketing words: delete on sight.
+<!-- plain:end -->
 
 ## Lifecycle
 
@@ -158,6 +169,10 @@ when refactoring.
   scratch doc's durable facts into code carriers and leaves the file. Git
   history is the only committed archive.
 
+<!-- predoc:end -->
+
+<!-- precode:start -->
+
 ## Smells & Discipline
 
 - The same logic written twice → fold it into one place.
@@ -166,7 +181,11 @@ when refactoring.
   hold; tests verify the algorithm, the algorithm is never bent to satisfy
   a test — no symptom-patching ifs, no silenced checks.
 
+<!-- precode:end -->
+
 # Agent Orchestration
+
+<!-- presession:start -->
 
 - A substantive modification task runs as a Workflow; trivial or
   conversational turns run solo.
@@ -174,15 +193,24 @@ when refactoring.
   diagnose only, never edit.
 - A failed audit loops to a fix round, then re-audit, until clean or the
   round cap hits.
+
+<!-- presession:end -->
+
+<!-- preread:start -->
 - A read-or-trace task refreshes the cleanread index incrementally before it
   starts (`index_build --incremental` then `enrich_treesitter --files`) and
   rebuilds it fully (`index_build` then `enrich_treesitter`) once it closes;
   a turn-level audit uses the throwaway parse, never the index.
+- A read or trace locates a `path:line` with `cleanscan`, then lifts only that
+  byte span with `cleanread`, before any repo-wide grep or whole-file read.
 - Reuse before re-search: every agent opens with `trace preflight` to reuse
   the locating queries earlier agents logged — queries run without --no-log
   so they accumulate, and a hit skips the re-locating. The rule is reuse, not
   bounded retrieval: once an agent has located (or when reuse misses) it
   freely picks grep/Read.
+<!-- preread:end -->
+
+<!-- presession:start -->
 - Before fanning out, a read-only scout subagent (`cleantools-scout`, holding
   only cleanread and cleanscan) explores, logs its locating queries to trace,
   and emits a `path:line` anchor map for downstream reuse.
@@ -192,3 +220,6 @@ when refactoring.
   hands that part to a normal full-tool agent that freely greps/Reads.
 - A subtask that writes, runs commands, or reads unindexed content uses a
   normal full-tool agent.
+
+<!-- presession:end -->
+
