@@ -1,8 +1,8 @@
 // audience: internal
 // # style-rewrite-inject
 // 文风审计 Stop hook（已取代原阻塞式 style-audit）：把本回合最终回复交给外部短上下文流水线改写，
-// 再经 hookSpecificOutput.additionalContext 注入主 agent 并要求复述，使用户看到干净版、主 agent 也
-// 获得一条干净样例以减少后续风格漂移。流水线固定为：改写、审计、改写、审计、改写，取终稿。短上下文的
+// 再经 hookSpecificOutput.additionalContext 注入主 agent 供参考；该注入用户与模型都能看到，因此不要求主 agent
+// 复述、不让它多做一次重新输出；主 agent 据此获得一条干净样例以减少后续风格漂移。流水线固定为：改写、审计、改写、审计、改写，取终稿。短上下文的
 // 改写与审计 claude 进程不漂移，质量高于长上下文里主 agent 自改。运行前提：PATH 上有 claude CLI，用默认模型。
 // 取本回合文本前先等转写落盘：钩子可能在触发停止的最新一条 assistant 文本写进转写之前就运行，直接读会
 // 读到上一条；故先轮询，等当前回合的 assistant 文本出现（排在最后一条 user 记录之后）且不再增长，再取它。
@@ -155,10 +155,10 @@ draft = rewrite(draft, a2 && !a2.pass ? a2.issues : null) || draft;
 const final = draft;
 //// /固定流水线 ////
 
-//// 经 additionalContext 注入修正版，要求主 agent 复述并在后续保持平直风格 [@380kkm 2026-06-22] ////
+//// 经 additionalContext 注入修正版供参考，不要求复述、不让主 agent 多做一次重新输出 [@380kkm 2026-06-22] ////
 const prefix =
-  "你上一条回复存在风格漂移。下面是经独立改写与两轮审计得到的修正版。" +
-  "请把这段修正版作为你的回复重新完整输出一遍（只输出修正版正文，不要额外说明），" +
-  "并在后续回复中保持这种平直、完整句子、不电报体不缩写的风格：\n\n";
+  "以下是你上一条回复经独立改写与两轮审计得到的风格修正版，你和用户都已在此看到它。" +
+  "请在后续回复中保持这种平直、完整句子、不电报体不缩写的风格。" +
+  "本条仅供参考，无需重述、无需回应：\n\n";
 allow({ hookSpecificOutput: { hookEventName: "Stop", additionalContext: prefix + final } });
 //// /注入修正版 ////
