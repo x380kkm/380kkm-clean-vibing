@@ -40,19 +40,6 @@
             "type": "command",
             "command": "node",
             "args": [
-              "C:\\Users\\380kk\\.claude\\hooks\\style-audit.mjs"
-            ],
-            "timeout": 200,
-            "statusMessage": "文风审计中…"
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node",
-            "args": [
               "C:\\Users\\380kk\\.claude\\hooks\\comment-test-probe.mjs"
             ],
             "timeout": 360,

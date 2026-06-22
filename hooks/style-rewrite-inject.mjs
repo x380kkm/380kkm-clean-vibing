@@ -1,10 +1,9 @@
 // audience: internal
 // # style-rewrite-inject
-// 实验性 Stop hook（A/B 的 B 边）：把本回合最终回复交给外部短上下文流水线改写，再经
-// hookSpecificOutput.additionalContext 注入主 agent 并要求复述，使用户看到干净版、主 agent 也获得
-// 一条干净样例以减少后续风格漂移。流水线固定为：改写、审计、改写、审计、改写，取终稿。短上下文的
-// 改写与审计 claude 进程不漂移，改写质量高于长上下文里主 agent 自改。仅在 resolveMode(cwd) 为
-// inject 时运行（设了 CLAUDE_STYLE_MODE=inject，且未被 CLAUDE_STYLE_TEST_ROOT 排除）。
+// 文风审计 Stop hook（已取代原阻塞式 style-audit）：把本回合最终回复交给外部短上下文流水线改写，
+// 再经 hookSpecificOutput.additionalContext 注入主 agent 并要求复述，使用户看到干净版、主 agent 也
+// 获得一条干净样例以减少后续风格漂移。流水线固定为：改写、审计、改写、审计、改写，取终稿。短上下文的
+// 改写与审计 claude 进程不漂移，质量高于长上下文里主 agent 自改。运行前提：PATH 上有 claude CLI，用默认模型。
 // 不变量一：嵌套 claude 进程（CLAUDE_HOOK_NESTED=1）直接放行，断开递归。
 // 不变量二：stop_hook_active 为真表示本次停止由注入续写引发，直接放行，断开续写循环。
 // 不变量三：任一子调用失败、超时或无法解析时放行不注入，绝不因改写器坏掉卡死会话。
@@ -12,7 +11,6 @@
 import fs from "node:fs";
 import os from "node:os";
 import { spawnSync } from "node:child_process";
-import { resolveMode } from "./lib/style-mode.mjs";
 
 const MIN_CHARS = 280;        // 短于此的回复跳过，减少不必要的流水线开销
 const SUBCALL_TIMEOUT = 90000;
@@ -50,14 +48,12 @@ if (process.env.CLAUDE_HOOK_NESTED === "1") allow();
 //// 读取 Stop 事件输入 [@380kkm 2026-06-22] ////
 let input = {};
 try { input = JSON.parse(fs.readFileSync(0, "utf8") || "{}"); } catch { input = {}; }
-const cwd = input.cwd || process.cwd();
 const transcript = input.transcript_path;
 //// /读取 Stop 事件输入 ////
 
-//// 模式闸与续写闸：非 inject 模式、或本次停止由注入续写引发，直接放行 [@380kkm 2026-06-22] ////
-if (resolveMode(cwd) !== "inject") allow();
+//// 续写闸：本次停止由注入续写引发时直接放行，断开续写循环 [@380kkm 2026-06-22] ////
 if (input.stop_hook_active) allow();
-//// /模式闸与续写闸 ////
+//// /续写闸 ////
 
 //// 从转写取最后一条 assistant 文本；过短则跳过 [@380kkm 2026-06-22] ////
 function lastAssistantText(tp) {
