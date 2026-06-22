@@ -19,26 +19,46 @@ function readClaudeMd() {
 }
 //// /读用户级 CLAUDE.md ////
 
-//// 抽取某标记下所有块、拼接、剥掉块内嵌套标记注释与 CRLF；无则返回空串 [@380kkm 2026-06-22] ////
-export function extractBlocks(tag) {
+//// 抽取某标记下所有块，各自剥掉嵌套标记注释与 CRLF、折叠空行、去首尾空白；无则返回空数组 [@380kkm 2026-06-22] ////
+function extractRawBlocks(tag) {
   const md = readClaudeMd();
-  if (!md) return "";
+  if (!md) return [];
   const re = new RegExp(`<!--\\s*${tag}:start\\s*-->([\\s\\S]*?)<!--\\s*${tag}:end\\s*-->`, "g");
-  const blocks = [...md.matchAll(re)]
+  return [...md.matchAll(re)]
     .map((m) => m[1].replace(/<!--[\s\S]*?-->/g, "").replace(/\r/g, "").replace(/\n{3,}/g, "\n\n").trim())
     .filter(Boolean);
-  return blocks.join("\n\n");
 }
 //// /抽取某标记下所有块 ////
 
-//// 组装某场景的注入文本：场景块去掉与 plain 重复的行后附上 plain 块；都为空返回空串 [@380kkm 2026-06-22] ////
-export function composeInjection(tag) {
-  const plain = extractBlocks("plain");
-  let scenario = extractBlocks(tag);
-  if (scenario && plain) {
-    const plainSet = new Set(plain.split("\n").map((l) => l.trim()).filter(Boolean));
-    scenario = scenario.split("\n").filter((l) => !plainSet.has(l.trim())).join("\n").replace(/\n{3,}/g, "\n\n").trim();
-  }
-  return [scenario, plain].filter(Boolean).join("\n\n");
+//// 抽取某标记下所有块并以空行拼接；无则返回空串 [@380kkm 2026-06-22] ////
+export function extractBlocks(tag) {
+  return extractRawBlocks(tag).join("\n\n");
 }
-//// /组装某场景的注入文本 ////
+//// /拼接某标记下所有块 ////
+
+//// 从文本删去某段原文连同其相邻换行，两侧都有内容时以单个换行接合 [@380kkm 2026-06-22] ////
+function stripBlock(text, block) {
+  let i = text.indexOf(block);
+  while (i !== -1) {
+    let start = i, end = i + block.length;
+    while (start > 0 && text[start - 1] === "\n") start--;
+    while (end < text.length && text[end] === "\n") end++;
+    const joiner = start > 0 && end < text.length ? "\n" : "";
+    text = text.slice(0, start) + joiner + text.slice(end);
+    i = text.indexOf(block);
+  }
+  return text;
+}
+//// /删去某段原文 ////
+
+//// 组装某场景注入文本：从场景块删去每个 plain 块原文，再统一附一份 plain；都为空返回空串 [@380kkm 2026-06-22] ////
+export function composeInjection(tag) {
+  const plainBlocks = extractRawBlocks("plain");
+  let scenario = extractBlocks(tag);
+  if (scenario && plainBlocks.length) {
+    for (const block of plainBlocks) scenario = stripBlock(scenario, block);
+    scenario = scenario.trim();
+  }
+  return [scenario, plainBlocks.join("\n\n")].filter(Boolean).join("\n\n");
+}
+//// /组装某场景注入文本 ////

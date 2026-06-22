@@ -1,9 +1,9 @@
 // audience: internal
 // # style-rewrite-inject
-// 文风审计 Stop hook（已取代原阻塞式 style-audit）：把本回合最终回复交给外部短上下文流水线改写，
-// 再经 hookSpecificOutput.additionalContext 注入主 agent 供参考；该注入用户与模型都能看到，因此不要求主 agent
-// 复述、不让它多做一次重新输出；主 agent 据此获得一条干净样例以减少后续风格漂移。流水线固定为：改写、审计、改写、审计、改写，取终稿。短上下文的
-// 改写与审计 claude 进程不漂移，质量高于长上下文里主 agent 自改。运行前提：PATH 上有 claude CLI，用默认模型。
+// 文风审计 Stop hook（取代原阻塞式 style-audit）：把本回合最终回复交给外部短上下文流水线改写，再经
+// hookSpecificOutput.additionalContext 注入主 agent 供参考；该注入用户与模型都能看到，主 agent 无需复述、
+// 无需重新输出。流水线固定为：改写、审计、改写、审计、改写，取终稿，由短上下文的独立 claude 进程执行。
+// 运行前提：PATH 上有 claude CLI，用默认模型。
 // 取本回合文本前先等转写落盘：钩子可能在触发停止的最新一条 assistant 文本写进转写之前就运行，直接读会
 // 读到上一条；故先轮询，等当前回合的 assistant 文本出现（排在最后一条 user 记录之后）且不再增长，再取它。
 // 不变量一：嵌套 claude 进程（CLAUDE_HOOK_NESTED=1）直接放行，断开递归。
@@ -15,14 +15,18 @@ import os from "node:os";
 import { spawnSync } from "node:child_process";
 import { extractBlocks } from "./lib/claude-md.mjs";
 
-const MIN_CHARS = 280;        // 短于此的回复跳过，减少不必要的流水线开销
+// 改写的最小字数门槛，短于此跳过
+const MIN_CHARS = 280;
 const SUBCALL_TIMEOUT = 90000;
-const WAIT_MS = 3000;         // 等转写落盘的最长时间
-const POLL_MS = 150;          // 轮询间隔
+// 等转写落盘的最长时间
+const WAIT_MS = 3000;
+// 轮询间隔
+const POLL_MS = 150;
 
-// 平直语言标准从 CLAUDE.md 的 plain 块取，读不到时用兜底。
+//// 从 CLAUDE.md 的 plain 块取平直语言标准，读不到用兜底 [@380kkm 2026-06-22] ////
 const PLAIN_CRITERIA = extractBlocks("plain") ||
   "完整句子，不用电报体或碎片短语，不堆砌缩写，新造代号首次出现给半句解释；没有翻译腔与营销词；中文用全角标点，中文与英文或数字之间留一个空格。";
+//// /取平直语言标准 ////
 
 const AUDIT_RUBRIC = `你是一个独立的中文写作风格审计器。只判断给定文本的"文风"，不评价其技术内容是否正确，也没有任何项目背景，不要试图理解项目。
 
@@ -41,7 +45,7 @@ ${PLAIN_CRITERIA}
 
 只输出改写后的正文，不要任何解释、不要代码块围栏。`;
 
-//// 输出一段 hook JSON 并按放行退出 ////
+//// 输出一段 hook JSON 并按放行退出 [@380kkm 2026-06-22] ////
 function allow(extra) {
   process.stdout.write(JSON.stringify(extra ?? {}));
   process.exit(0);
@@ -99,7 +103,7 @@ while (cur.lastText < cur.lastUser && Date.now() - start < WAIT_MS) {
   sleepSync(POLL_MS);
   cur = scan(readLines(transcript));
 }
-if (cur.lastText < cur.lastUser) allow();   // 当前回合文本始终未落盘，宁可不注入也不复述过时内容
+if (cur.lastText < cur.lastUser) allow();
 let lines = readLines(transcript);
 let prevLen = lines.length, stable = 0;
 while (Date.now() - start < WAIT_MS) {

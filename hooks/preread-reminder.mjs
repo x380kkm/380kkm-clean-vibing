@@ -9,9 +9,10 @@ import os from "node:os";
 import path from "node:path";
 import { composeInjection } from "./lib/claude-md.mjs";
 
-const THROTTLE_MS = 15 * 60 * 1000;        // 同 session 最多每 15 分钟注一次
+// 同 session 的注入间隔：15 分钟
+const THROTTLE_MS = 15 * 60 * 1000;
 
-//// 输出一段 hook JSON 并退出 ////
+//// 输出一段 hook JSON 并退出 [@380kkm 2026-06-22] ////
 function emit(obj) { process.stdout.write(JSON.stringify(obj ?? {})); process.exit(0); }
 
 //// 防递归：嵌套 claude 进程直接放行 [@380kkm 2026-06-22] ////
@@ -35,7 +36,7 @@ const now = Date.now();
 let last = 0;
 try { last = parseInt(fs.readFileSync(stampFile, "utf8"), 10) || 0; } catch { last = 0; }
 if (now - last < THROTTLE_MS) emit({});
-try { fs.writeFileSync(stampFile, String(now)); } catch { /* 写不了时间戳也照常注入一次 */ }
+try { fs.writeFileSync(stampFile, String(now)); } catch {}
 //// /节流 ////
 
 emit({ hookSpecificOutput: { hookEventName: "PreToolUse", additionalContext: ctx } });
