@@ -1,6 +1,6 @@
 // audience: internal
 // # style-rewrite-inject
-// 文风审计 Stop hook（取代原阻塞式 style-audit）：把本回合最终回复交给外部短上下文流水线改写，再经
+// 文风审计 Stop hook：把本回合最终回复交给外部短上下文流水线改写，再经
 // hookSpecificOutput.additionalContext 注入主 agent 供参考；该注入用户与模型都能看到，主 agent 无需复述、
 // 无需重新输出。流水线固定为：改写、审计、改写、审计、改写，取终稿，由短上下文的独立 claude 进程执行。
 // 运行前提：PATH 上有 claude CLI，用默认模型。
@@ -50,6 +50,7 @@ function allow(extra) {
   process.stdout.write(JSON.stringify(extra ?? {}));
   process.exit(0);
 }
+//// /输出一段 hook JSON 并按放行退出 ////
 
 //// 防递归：嵌套 claude 进程直接放行 [@380kkm 2026-06-22] ////
 if (process.env.CLAUDE_HOOK_NESTED === "1") allow();
@@ -61,9 +62,9 @@ try { input = JSON.parse(fs.readFileSync(0, "utf8") || "{}"); } catch { input = 
 const transcript = input.transcript_path;
 //// /读取 Stop 事件输入 ////
 
-//// 续写闸：本次停止由注入续写引发时直接放行，断开续写循环 [@380kkm 2026-06-22] ////
+//// 防续写循环：本次停止由注入续写引发时直接放行 [@380kkm 2026-06-22] ////
 if (input.stop_hook_active) allow();
-//// /续写闸 ////
+//// /防续写循环 ////
 
 //// 同步休眠，给转写落盘留时间 [@380kkm 2026-06-22] ////
 function sleepSync(ms) { Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms); }

@@ -3,6 +3,7 @@
 // 从用户级 CLAUDE.md 按场景标记块抽取内容，供各提醒钩子共用，使 CLAUDE.md 成为单一事实源。
 // 一个标记是一对 <!-- tag:start --> 与 <!-- tag:end --> 注释；同名标记可有多块，全部拼接。抽取时剥掉
 // 块内嵌套的标记注释，避免重叠标记（如 plain 嵌在 precode 内）把标记文本带进输出。
+// composeInjection 按整块子串删除去重，要求每个 plain 块在场景块内的缩进与其单独抽取时相同，都在第 0 列。
 // 用 os.homedir() 定位 CLAUDE.md，不含机器特定路径。读不到或无该标记时返回空串，由调用方决定是否跳过。
 
 import fs from "node:fs";
