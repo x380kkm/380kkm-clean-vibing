@@ -79,7 +79,7 @@ ${body}`;
 // //// /组装提示词：压缩、判断项目工作、审计 ////
 
 // //// 起子 agent 产出回顾；失败则保留旧回顾放行 [@380kkm 2026-06-15] ////
-const res = spawnSync("claude -p", {
+const res = spawnSync("claude -p --model sonnet", {
   input: RUBRIC,
   shell: true,
   cwd: os.tmpdir(),                                    // 隔离：临时目录

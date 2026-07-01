@@ -189,12 +189,20 @@ when refactoring.
 
 - A substantive modification task runs as a Workflow; trivial or
   conversational turns run solo.
-- Agents use model `opus` (`fable` is currently unavailable); audit agents
-  diagnose only, never edit.
+- Judgment agents — orchestration, adversarial verify, judge panels, final
+  synthesis — use model `opus` at effort `max`; execution agents — scouting,
+  mechanical extraction, per-file reads, the Stop audit hooks — use model
+  `sonnet` (`fable` unavailable). Audit agents diagnose only, never edit.
 - A failed audit loops to a fix round, then re-audit, until clean or the
   round cap hits.
 
 <!-- presession:end -->
+
+<!-- presubmit:start -->
+
+- 读参考、确认项目内容时，先单独跑一个侦察 workflow 再开正常并行：`Workflow` 调 `scout-first-read`，传 `args: { goal, root, subtasks }`；scout 只读定位产 `path:line` 锚点地图，fan 按 `subtasks` 并行精读、各自回带锚点的答案，据此再开正常并行 workflow。
+
+<!-- presubmit:end -->
 
 <!-- preread:start -->
 - A read-or-trace task refreshes the cleanread index incrementally before it

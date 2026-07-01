@@ -135,7 +135,7 @@ ${auditMaterial || "（上下文为空或无法获取）"}`;
 
 // //// 启动独立 claude 进程验证，解析判定结果 [@380kkm 2026-06-15] ////
 let verdict = null;
-const res = spawnSync("claude -p", {
+const res = spawnSync("claude -p --model sonnet", {
   input: RUBRIC,
   shell: true,
   cwd,

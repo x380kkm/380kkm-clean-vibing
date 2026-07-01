@@ -118,7 +118,7 @@ if (original.length < MIN_CHARS) allow();
 
 //// 起一个隔离的、无项目上下文的 claude 子进程；失败返回 null [@380kkm 2026-06-22] ////
 function runClaude(prompt) {
-  const res = spawnSync("claude -p", {
+  const res = spawnSync("claude -p --model sonnet", {
     input: prompt,
     shell: true,
     cwd: os.tmpdir(),

@@ -112,6 +112,18 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "C:\\Users\\380kk\\.claude\\hooks\\explore-nudge.mjs"
+            ],
+            "timeout": 10
+          }
+        ]
       }
     ],
     "PreToolUse": [
@@ -145,6 +157,7 @@
   },
   "enableWorkflows": true,
   "ultracode": true,
+  "effortLevel": "max",
   "autoUpdatesChannel": "latest",
   "tui": "fullscreen",
   "skipDangerousModePermissionPrompt": true,

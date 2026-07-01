@@ -60,7 +60,7 @@ const map = await agent(
   `侦察目标：${goal}\n项目根：${root}\n` +
   `用 cleanread 与 cleanscan 在 ${root}/cleanread 的正式索引上探索定位，查询不加 --no-log（沉淀进 trace 供下游复用），` +
   `产出带 path:line 锚点的清单。遇依赖追踪这类发散目标追不动时，交回已得锚点、把未探明区域列进 unexplored、coverage 标 partial。`,
-  { agentType: 'cleantools-scout', label: 'scout', phase: 'Scout', schema: MAP_SCHEMA }
+  { agentType: 'cleantools-scout', label: 'scout', phase: 'Scout', schema: MAP_SCHEMA, model: 'sonnet' }
 )
 
 const anchors = (map && map.anchors) || []
@@ -90,7 +90,7 @@ const results = await parallel(subtasks.map((st, i) => () =>
     `--- 侦察锚点（可直接据此有界提取） ---\n${mapText}\n` +
     `--- 未探明区域（落在这里就自由探索） ---\n${unexploredText}\n` +
     `${DISCIPLINE}`,
-    { label: `fan:${i + 1}`, agentType: 'general-purpose', phase: 'Fan', schema: ANSWER_SCHEMA }
+    { label: `fan:${i + 1}`, agentType: 'general-purpose', phase: 'Fan', schema: ANSWER_SCHEMA, model: 'sonnet' }
   )
 ))
 
