@@ -1,4 +1,7 @@
 {
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
   "permissions": {
     "defaultMode": "bypassPermissions"
   },
@@ -156,6 +159,7 @@
     ]
   },
   "enableWorkflows": true,
+  "alwaysThinkingEnabled": true,
   "ultracode": true,
   "effortLevel": "max",
   "autoUpdatesChannel": "latest",
@@ -163,6 +167,8 @@
   "skipDangerousModePermissionPrompt": true,
   "theme": "dark",
   "remoteControlAtStartup": true,
+  "inputNeededNotifEnabled": false,
+  "agentPushNotifEnabled": true,
   "skipAutoPermissionPrompt": true,
-  "model": "opus[1m]"
+  "model": "claude-fable-5[1m]"
 }

@@ -192,7 +192,7 @@ when refactoring.
 - Judgment agents — orchestration, adversarial verify, judge panels, final
   synthesis — use model `opus` at effort `max`; execution agents — scouting,
   mechanical extraction, per-file reads, the Stop audit hooks — use model
-  `sonnet` (`fable` unavailable). Audit agents diagnose only, never edit.
+  `sonnet`. Audit agents diagnose only, never edit.
 - A failed audit loops to a fix round, then re-audit, until clean or the
   round cap hits.
 
