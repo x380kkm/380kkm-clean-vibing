@@ -29,13 +29,15 @@ LANG_FOR_EXT: dict[str, str] = {
     ".java": "java",
     # gdscript（Godot）
     ".gd": "gdscript",
+    # godot 场景/资源（.tscn/.tres，用 tree-sitter-godot_resource 文法）
+    ".tscn": "godot_resource", ".tres": "godot_resource",
 }
 #### /语言注册表 ####
 
 #### 实际支持解析的语言集合（使用 list 以便扩展时原地追加，`from-import` 的调用方可见） [@380kkm 2026-06-05] ####
 SUPPORTED_LANGS: list[str] = [
     "cpp", "python", "javascript", "typescript", "tsx", "csharp", "glsl",
-    "java", "gdscript",
+    "java", "gdscript", "godot_resource",
 ]
 #### /我们实际能解析的语言集合 ####
 
@@ -51,6 +53,7 @@ _PACK_NAME: dict[str, str] = {
     "glsl": "glsl",
     "java": "java",
     "gdscript": "gdscript",
+    "godot_resource": "godot_resource",
 }
 #### /语言名到文法名映射 ####
 

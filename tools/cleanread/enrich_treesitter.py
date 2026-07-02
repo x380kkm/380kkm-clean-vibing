@@ -97,6 +97,7 @@ from enrich.langs.glsl import _GLSL_DEFS, _walk_glsl
 from enrich.langs.java import (_JAVA_CALLABLE, _JAVA_TYPE_DEFS,
                                _JAVA_TYPE_KINDS, _java_type_names, _walk_java)
 from enrich.langs.gdscript import _gd_first_ident, _walk_gdscript
+from enrich.langs.godot_resource import _walk_godot_resource
 from enrich.langs import HAS_WALKER, WALKERS
 from enrich.query import (_QUERY_DIR, _dsl_list_ancestor, _dsl_name,
                           _load_query_specs, _query_edges, _query_symbols,

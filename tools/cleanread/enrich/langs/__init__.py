@@ -6,6 +6,7 @@ from enrich.langs.cpp import _walk_cpp
 from enrich.langs.csharp import _walk_csharp
 from enrich.langs.gdscript import _walk_gdscript
 from enrich.langs.glsl import _walk_glsl
+from enrich.langs.godot_resource import _walk_godot_resource
 from enrich.langs.java import _walk_java
 from enrich.langs.javascript import _walk_javascript
 from enrich.langs.python import _walk_python
@@ -22,6 +23,7 @@ WALKERS = {
     "glsl": _walk_glsl,
     "java": _walk_java,
     "gdscript": _walk_gdscript,
+    "godot_resource": _walk_godot_resource,
 }
 #### /语言名称到遍历器函数的分发表 ####
 
