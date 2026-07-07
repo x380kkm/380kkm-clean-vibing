@@ -13,6 +13,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { planDimension } from "./lib/cleanaudit-bridge.mjs";
+import { scanJargon, KEEP } from "./lib/jargon-lexicon.mjs";
 
 const MAX_BLOCKS = 1;
 
@@ -128,12 +129,34 @@ const getCount = () => {
 const setCount = (n) => { try { fs.writeFileSync(countFile, String(n)); } catch { /* 忽略 */ } };
 // //// /MAX_BLOCKS 计数：读写 tmpdir 计数文件 ////
 
+// //// 词典快扫：命中本项目常见黑话立即打断，省去模型调用，让审计更敏捷 [@380kkm 2026-07-07] ////
+const lexHits = scanJargon(diff);
+if (lexHits.length > 0) {
+  const n = getCount() + 1;
+  if (n > MAX_BLOCKS) {
+    setCount(0);
+    allow({ systemMessage: `黑话审计连续 ${MAX_BLOCKS} 次未通过，已放行，请人工复核命名。` });
+  }
+  setCount(n);
+  const list = lexHits.map(h => `- "${h.term}" -> ${h.good}（见：${h.sample}）`).join("\n");
+  allow({
+    decision: "block",
+    reason: `黑话审计未通过（第 ${n}/${MAX_BLOCKS} 次，词典命中）。下列是本项目常见黑话，请改成右侧平直说法或在首次出现处加半句解释：\n${list}`,
+  });
+}
+// //// /词典快扫：命中本项目常见黑话立即打断，省去模型调用 ////
+
 const RUBRIC = `你是一个代码黑话审计器。只判断以下 diff 里新增的注释和标识符命名有没有"黑话"。
 
 黑话定义（满足任意一条即算黑话）：
 1. 生造代号：自造的简写或符号，在整个 diff 范围内首次出现时没有任何解释（哪怕半句也算）。
 2. 未解释缩写：行业外不通用的缩写（如 FCS、TSK、PMR），且首次出现时没有展开或说明。
 3. 内部暗语：仅靠内部约定才能理解的词，读者无法从上下文或命名本身推断含义。
+4. 中文注释里的不平直表达：把普通动作/状态/关系说成比喻（如"回落""烧进""接线"）、
+   拟人（让代码/函数/文件"认识/知道/回答"）、口语缩略（如"跑对应 JSON""装 0xA9"）、
+   颜色喻状态（如"全绿"喻测试通过）、生造压缩（把多词压成单字或拼接）。改成平直技术陈述。
+
+以下确立术语与字面词不算黑话，出现时不要 flag：${KEEP.join("、")}。
 
 不属于黑话（不要误判）：
 - 通用编程术语（如 fn、ctx、req、res、idx、tmp、err、cb、args、opts、buf、num、str、len、id、db、api、url、http、json、sql）。
