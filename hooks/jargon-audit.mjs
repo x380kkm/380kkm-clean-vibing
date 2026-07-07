@@ -129,22 +129,10 @@ const getCount = () => {
 const setCount = (n) => { try { fs.writeFileSync(countFile, String(n)); } catch { /* 忽略 */ } };
 // //// /MAX_BLOCKS 计数：读写 tmpdir 计数文件 ////
 
-// //// 词典快扫：命中本项目常见黑话立即打断，省去模型调用，让审计更敏捷 [@380kkm 2026-07-07] ////
-const lexHits = scanJargon(diff);
-if (lexHits.length > 0) {
-  const n = getCount() + 1;
-  if (n > MAX_BLOCKS) {
-    setCount(0);
-    allow({ systemMessage: `黑话审计连续 ${MAX_BLOCKS} 次未通过，已放行，请人工复核命名。` });
-  }
-  setCount(n);
-  const list = lexHits.map(h => `- "${h.term}" -> ${h.good}（见：${h.sample}）`).join("\n");
-  allow({
-    decision: "block",
-    reason: `黑话审计未通过（第 ${n}/${MAX_BLOCKS} 次，词典命中）。下列是本项目常见黑话，请改成右侧平直说法或在首次出现处加半句解释：\n${list}`,
-  });
-}
-// //// /词典快扫：命中本项目常见黑话立即打断，省去模型调用 ////
+// //// 词典快扫：确定性列出本项目常见黑话，稍后与模型结果合并成一份清单 [@380kkm 2026-07-07] ////
+// 此处不打断：先扫词典，再跑模型审词典外的新黑话，两份合并后一次性给完整清单，避免分两轮打断。
+const lexIssues = scanJargon(diff).map(h => `"${h.term}" -> ${h.good}（见：${h.sample}）`);
+// //// /词典快扫：确定性列出本项目常见黑话 ////
 
 const RUBRIC = `你是一个代码黑话审计器。只判断以下 diff 里新增的注释和标识符命名有没有"黑话"。
 
@@ -185,27 +173,19 @@ if (res.status === 0 && !res.error && res.stdout) {
   const m = res.stdout.match(/\{[\s\S]*\}/);
   if (m) { try { verdict = JSON.parse(m[0]); } catch { verdict = null; } }
 }
-// 解析失败、报错、超时或 pass 非布尔值时，一律放行（审计器出错不阻断会话）
-if (!verdict || typeof verdict.pass !== "boolean") {
-  setCount(0);
-  allow({ systemMessage: "黑话审计未能运行或返回无法解析，本次已放行。" });
-}
+// 模型出错/超时/无法解析：fail-open 只作用于模型部分，模型结果记为空；词典命中仍然算数
+const llmOk = verdict && typeof verdict.pass === "boolean";
+const llmIssues = (llmOk && verdict.pass === false && Array.isArray(verdict.issues))
+  ? verdict.issues
+  : [];
 // //// /起独立 claude 进程审计黑话，解析裁决 ////
 
-// //// 据裁决决定放行或打断 [@380kkm 2026-06-15] ////
-if (verdict.pass) {
+// //// 合并词典命中与模型结果，一次性给完整清单，至多打断一次 [@380kkm 2026-07-07] ////
+// 词典命中在前、模型判定在后，一份清单一次报完；MAX_BLOCKS 保证一个会话至多打断一次。
+const allIssues = [...lexIssues, ...llmIssues];
+if (allIssues.length === 0) {
   setCount(0);
-  allow();
-}
-
-const issues = Array.isArray(verdict.issues) && verdict.issues.length > 0
-  ? verdict.issues
-  : null;
-
-// pass===false 但 issues 为空：也放行（无具体问题无从改写）
-if (!issues) {
-  setCount(0);
-  allow({ systemMessage: "黑话审计返回 pass:false 但未给出具体问题，已放行。" });
+  allow(llmOk ? {} : { systemMessage: "黑话审计的模型部分未能运行，仅词典扫描已通过。" });
 }
 
 const n = getCount() + 1;
@@ -215,9 +195,9 @@ if (n > MAX_BLOCKS) {
 }
 setCount(n);
 
-const issueList = issues.map(s => `- ${s}`).join("\n");
+const issueList = allIssues.map(s => `- ${s}`).join("\n");
 allow({
   decision: "block",
-  reason: `黑话审计未通过（第 ${n}/${MAX_BLOCKS} 次）。以下命名或注释属于黑话（生造代号、未解释缩写、内部暗语，且首次出现无解释），请改成平实表达或在首次出现处加半句说明：\n${issueList}`,
+  reason: `黑话审计未通过（第 ${n}/${MAX_BLOCKS} 次）。下面是本回合新增注释/命名里扫出的全部黑话（词典命中在前，模型判定在后），请一次性改成平直说法或在首次出现处加半句解释：\n${issueList}`,
 });
-// //// /据裁决决定放行或打断 ////
+// //// /合并词典命中与模型结果，一次性给完整清单 ////
