@@ -1,12 +1,13 @@
 // audience: internal
 // # jargon-audit-hook
-// 阻塞型 Stop hook：检查本回合改动源码里新增的注释与命名有没有"黑话"——生造代号、
-// 未解释缩写、内部暗语，且首次出现没有半句解释。只判这一件事，不评判正确性、风格、
-// 阶梯标记或其它任何东西。
-// 运行前提：PATH 上有 claude CLI 和 git。
-// 不变量一：审计器报错/超时/无法解析一律放行（fail-open），不因审计器坏掉而卡死会话。
-// 不变量二：嵌套 claude 进程（CLAUDE_HOOK_NESTED=1）直接放行，断开递归。
-// 不变量三：同一回合最多打断 MAX_BLOCKS 次，超出则放行并告警，防 block 死循环。
+// 阻塞型 Stop hook:检查本回合改动源码里新增的注释与命名有没有"黑话" - 生造代号,
+// 未解释缩写,内部暗语,且首次出现没有半句解释.只判这一件事,不评判正确性,风格,
+// 阶梯标记或其它任何东西.
+// 运行前提:PATH 上有 codex CLI 和 git.
+// 不变量一:审计器报错/超时/无法解析一律放行(fail-open),不因审计器坏掉而卡死会话.
+// 不变量二:嵌套 codex 子进程(CODEX_HOOK_NESTED=1)直接放行,断开递归.
+// 不变量三:stop_hook_active 为真表示本次停止由 hook 续写引发,直接放行,断开续写循环.
+// 不变量四:同一回合最多打断 MAX_BLOCKS 次,超出则放行并告警,防 block 死循环.
 
 import fs from "node:fs";
 import os from "node:os";
@@ -14,8 +15,10 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { planDimension } from "./lib/cleanaudit-bridge.mjs";
 import { scanJargon, KEEP } from "./lib/jargon-lexicon.mjs";
+import { runReadOnlyAuditCodex, truncateModelInput } from "./lib/nested-codex.mjs";
 
 const MAX_BLOCKS = 1;
+const MAX_MODEL_INPUT_CHARS = 64_000;
 
 // 源码文件扩展名白名单
 const SOURCE_EXTS = new Set([
@@ -24,30 +27,34 @@ const SOURCE_EXTS = new Set([
   ".cs", ".rb", ".swift", ".kt", ".scala", ".sh", ".bash",
 ]);
 
-// 向 stdout 输出 hook JSON 并以放行状态退出。
+// 向 stdout 输出 hook JSON 并以放行状态退出.
 function allow(extra) {
   process.stdout.write(JSON.stringify(extra ?? {}));
   process.exit(0);
 }
 
-// //// 防递归：嵌套 claude 进程直接放行 [@380kkm 2026-06-15] ////
-if (process.env.CLAUDE_HOOK_NESTED === "1") allow();
-// //// /防递归：嵌套 claude 进程直接放行 ////
+// //// 防递归:嵌套 codex 子进程直接放行 [@380kkm 2026-06-15] ////
+if (process.env.CODEX_HOOK_NESTED === "1") allow();
+// //// /防递归:嵌套 codex 子进程直接放行 ////
 
 // //// 读取 Stop hook stdin 输入 [@380kkm 2026-06-15] ////
 let input = {};
-try { input = JSON.parse(fs.readFileSync(0, "utf8") || "{}"); } catch { input = {}; }
+try { input = JSON.parse((fs.readFileSync(0, "utf8") || "{}").replace(/^\uFEFF+/, "")); } catch { input = {}; }
 const sessionId = input.session_id || "nosession";
 const cwd = input.cwd || process.cwd();
 // //// /读取 Stop hook stdin 输入 ////
 
+// //// 防续写循环:本次停止由 hook 续写引发时直接放行 [@380kkm 2026-07-09] ////
+if (input.stop_hook_active) allow();
+// //// /防续写循环 ////
+
 // //// 用 git 取本回合改动的源码文件列表 [@380kkm 2026-06-15] ////
 function getChangedSourceFiles(dir) {
-  // 已跟踪文件（相对 HEAD 有改动）
+  // 已跟踪文件(相对 HEAD 有改动)
   const tracked = spawnSync("git", ["diff", "--name-only", "HEAD"], {
     cwd: dir, encoding: "utf8", timeout: 10000,
   });
-  if (tracked.status !== 0 || tracked.error) return null;   // git 失败，放行
+  if (tracked.status !== 0 || tracked.error) return null;
 
   // 未跟踪文件
   const untracked = spawnSync("git", ["ls-files", "--others", "--exclude-standard"], {
@@ -68,15 +75,15 @@ const sourceFiles = getChangedSourceFiles(cwd);
 if (!sourceFiles || sourceFiles.length === 0) allow();   // git 失败或无源码改动
 // //// /用 git 取本回合改动的源码文件列表 ////
 
-// //// cleanaudit 预过滤：本回合无改动符号则跳过，省去模型调用 [@380kkm 2026-06-16] ////
+// //// cleanaudit 预过滤:本回合无改动符号则跳过,省去模型调用 [@380kkm 2026-06-16] ////
 if (planDimension("jargon", cwd) === "skip") allow();
 // //// /cleanaudit 预过滤 ////
 
-// //// 组装 diff 内容：已跟踪文件取 diff，未跟踪文件取全文 [@380kkm 2026-06-15] ////
+// //// 组装 diff 内容:已跟踪文件取 diff,未跟踪文件取全文 [@380kkm 2026-06-15] ////
 function buildDiff(dir, files) {
   const parts = [];
 
-  // 已跟踪：取 git diff HEAD -- <file>
+  // 已跟踪:取 git diff HEAD -- <file>
   const trackedDiff = spawnSync("git", ["diff", "HEAD", "--", ...files], {
     cwd: dir, encoding: "utf8", timeout: 15000, maxBuffer: 4 * 1024 * 1024,
   });
@@ -84,7 +91,7 @@ function buildDiff(dir, files) {
     parts.push(trackedDiff.stdout);
   }
 
-  // 未跟踪：ls-files --others 交集 files，直接读文件内容作为"新增"
+  // 未跟踪:ls-files --others 交集 files,直接读文件内容作为"新增"
   const untrackedSet = (() => {
     const r = spawnSync("git", ["ls-files", "--others", "--exclude-standard"], {
       cwd: dir, encoding: "utf8", timeout: 10000,
@@ -106,10 +113,11 @@ function buildDiff(dir, files) {
 }
 
 const diff = buildDiff(cwd, sourceFiles);
-if (!diff.trim()) allow();   // 无有效 diff，放行
-// //// /组装 diff 内容：已跟踪文件取 diff，未跟踪文件取全文 ////
+if (!diff.trim()) allow();
+const modelDiff = truncateModelInput(diff, MAX_MODEL_INPUT_CHARS);
+// //// /组装 diff 内容:已跟踪文件取 diff,未跟踪文件取全文 ////
 
-// //// 留痕：把 diff 写到 archive/jargon-audit.md [@380kkm 2026-06-15] ////
+// //// 留痕:把 diff 写到 archive/jargon-audit.md [@380kkm 2026-06-15] ////
 try {
   const archiveDir = path.join(cwd, "archive");
   fs.mkdirSync(archiveDir, { recursive: true });
@@ -119,20 +127,20 @@ try {
     "utf8",
   );
 } catch { /* 写文件失败不阻断审计 */ }
-// //// /留痕：把 diff 写到 archive/jargon-audit.md ////
+// //// /留痕:把 diff 写到 archive/jargon-audit.md ////
 
-// //// MAX_BLOCKS 计数：读写 tmpdir 计数文件 [@380kkm 2026-06-15] ////
-const countFile = path.join(os.tmpdir(), `claude-jargon-audit-${sessionId}.count`);
+// //// MAX_BLOCKS 计数:读写 tmpdir 计数文件 [@380kkm 2026-06-15] ////
+const countFile = path.join(os.tmpdir(), `codex-jargon-audit-${sessionId}.count`);
 const getCount = () => {
   try { return parseInt(fs.readFileSync(countFile, "utf8"), 10) || 0; } catch { return 0; }
 };
 const setCount = (n) => { try { fs.writeFileSync(countFile, String(n)); } catch { /* 忽略 */ } };
-// //// /MAX_BLOCKS 计数：读写 tmpdir 计数文件 ////
+// //// /MAX_BLOCKS 计数:读写 tmpdir 计数文件 ////
 
-// //// 词典快扫：确定性列出本项目常见黑话，稍后与模型结果合并成一份清单 [@380kkm 2026-07-07] ////
-// 此处不打断：先扫词典，再跑模型审词典外的新黑话，两份合并后一次性给完整清单，避免分两轮打断。
+// //// 词典扫描:确定性列出本项目常见黑话,稍后与模型结果合并成一份清单 [@380kkm 2026-07-07] ////
+// 此处不打断:先扫词典,再跑模型审词典外的新黑话,两份合并后一次性给完整清单,避免分两轮打断.
 const lexIssues = scanJargon(diff).map(h => `"${h.term}" -> ${h.good}（见：${h.sample}）`);
-// //// /词典快扫：确定性列出本项目常见黑话 ////
+// //// /词典扫描:确定性列出本项目常见黑话 ////
 
 const RUBRIC = `你是一个代码黑话审计器。只判断以下 diff 里新增的注释和标识符命名有没有"黑话"。
 
@@ -158,13 +166,12 @@ const RUBRIC = `你是一个代码黑话审计器。只判断以下 diff 里新�
 或
 {"pass": false, "issues": ["具体黑话词及所在位置", "..."]}`;
 
-// //// 起独立 claude 进程审计黑话，解析裁决 [@380kkm 2026-06-15] ////
+// //// 起独立 codex 子进程审计黑话,解析裁决 [@380kkm 2026-06-15] ////
 let verdict = null;
-const res = spawnSync("claude -p --model sonnet", {
-  input: `${RUBRIC}\n\n====== diff 内容 ======\n${diff}`,
-  shell: true,
-  cwd: os.tmpdir(),                                        // 在临时目录运行，与当前项目隔离，避免引入项目上下文
-  env: { ...process.env, CLAUDE_HOOK_NESTED: "1" },        // 设置嵌套标记，防止递归触发审计
+const res = runReadOnlyAuditCodex({
+  input: `${RUBRIC}\n\n====== diff 内容 ======\n${modelDiff}`,
+  // 使用临时目录, 不加载当前项目上下文.
+  cwd: os.tmpdir(),
   encoding: "utf8",
   timeout: 100000,
   maxBuffer: 16 * 1024 * 1024,
@@ -173,15 +180,15 @@ if (res.status === 0 && !res.error && res.stdout) {
   const m = res.stdout.match(/\{[\s\S]*\}/);
   if (m) { try { verdict = JSON.parse(m[0]); } catch { verdict = null; } }
 }
-// 模型出错/超时/无法解析：fail-open 只作用于模型部分，模型结果记为空；词典命中仍然算数
+// 模型出错/超时/无法解析:fail-open 只作用于模型部分,模型结果记为空;词典命中仍然算数
 const llmOk = verdict && typeof verdict.pass === "boolean";
 const llmIssues = (llmOk && verdict.pass === false && Array.isArray(verdict.issues))
   ? verdict.issues
   : [];
-// //// /起独立 claude 进程审计黑话，解析裁决 ////
+// //// /起独立 codex 子进程审计黑话,解析裁决 ////
 
-// //// 合并词典命中与模型结果，一次性给完整清单，至多打断一次 [@380kkm 2026-07-07] ////
-// 词典命中在前、模型判定在后，一份清单一次报完；MAX_BLOCKS 保证一个会话至多打断一次。
+// //// 合并词典命中与模型结果,一次性给完整清单,至多打断一次 [@380kkm 2026-07-07] ////
+// 词典命中在前,模型判定在后,一份清单一次报完;MAX_BLOCKS 保证一个会话至多打断一次.
 const allIssues = [...lexIssues, ...llmIssues];
 if (allIssues.length === 0) {
   setCount(0);
@@ -200,4 +207,4 @@ allow({
   decision: "block",
   reason: `黑话审计未通过（第 ${n}/${MAX_BLOCKS} 次）。下面是本回合新增注释/命名里扫出的全部黑话（词典命中在前，模型判定在后），请一次性改成平直说法或在首次出现处加半句解释：\n${issueList}`,
 });
-// //// /合并词典命中与模型结果，一次性给完整清单 ////
+// //// /合并词典命中与模型结果,一次性给完整清单 ////

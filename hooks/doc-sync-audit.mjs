@@ -1,21 +1,24 @@
 // audience: internal
 // # doc-sync-audit-hook
-// 阻塞型 Stop hook：检查本回合是否存在"改了代码、但对应文件头块或相关文档未同步"的情况，
-// 对应 CLAUDE.md 中"改动与其触发的文档更新进同一提交"这条规则。
-// 取本回合完整 diff（含未跟踪文件内容）传给独立 claude，只判断文档与代码是否矛盾，
-// 不评判正确性、风格或其它——只有存在矛盾时才阻断。
-// 不变量一：嵌套 claude 进程（CLAUDE_HOOK_NESTED=1）直接放行，断开递归。
-// 不变量二：git 失败或本回合无源码改动则直接放行，不启动 claude。
-// 不变量三：审计器报错、超时或无法解析一律放行（fail-open），绝不因审计器坏掉而卡死会话。
-// 不变量四：同一回合最多打断 MAX_BLOCKS 次，超出则放行并告警，防止阻断死循环。
+// 阻塞型 Stop hook:检查本回合是否存在"改了代码,但对应文件头块或相关文档未同步"的情况,
+// 对应 AGENTS.md 中"改动与其触发的文档更新进同一提交"这条规则.
+// 取本回合 diff(含未跟踪文件内容)的有界首尾传给独立 `codex` 子进程,只判断文档与代码是否矛盾,
+// 不评判正确性,风格或其它 - 只有存在矛盾时才阻断.
+// 不变量一:嵌套 codex 子进程(CODEX_HOOK_NESTED=1)直接放行,断开递归.
+// 不变量二:git 失败或本回合无源码改动则直接放行,不启动 codex 子进程.
+// 不变量三:审计器报错,超时或无法解析一律放行(fail-open),绝不因审计器坏掉而卡死会话.
+// 不变量四:stop_hook_active 为真表示本次停止由 hook 续写引发,直接放行,断开续写循环.
+// 不变量五:同一回合最多打断 MAX_BLOCKS 次,超出则放行并告警,防止阻断死循环.
 
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { planDimension } from "./lib/cleanaudit-bridge.mjs";
+import { runReadOnlyAuditCodex, truncateModelInput } from "./lib/nested-codex.mjs";
 
-const MAX_BLOCKS = 1;    // 每个回合最多打断一次
+const MAX_BLOCKS = 1;
+const MAX_MODEL_INPUT_CHARS = 96_000;
 
 // //// 输出 hook JSON 并按放行退出 [@380kkm 2026-06-15] ////
 function allow(extra) {
@@ -24,19 +27,23 @@ function allow(extra) {
 }
 // //// /输出 hook JSON 并按放行退出 ////
 
-// //// 防递归：嵌套 claude 进程直接放行 [@380kkm 2026-06-15] ////
-if (process.env.CLAUDE_HOOK_NESTED === "1") allow();
-// //// /防递归：嵌套 claude 进程直接放行 ////
+// //// 防递归:嵌套 codex 子进程直接放行 [@380kkm 2026-06-15] ////
+if (process.env.CODEX_HOOK_NESTED === "1") allow();
+// //// /防递归:嵌套 codex 子进程直接放行 ////
 
 // //// 读取 Stop hook 输入 [@380kkm 2026-06-15] ////
 let input = {};
-try { input = JSON.parse(fs.readFileSync(0, "utf8") || "{}"); } catch { input = {}; }
+try { input = JSON.parse((fs.readFileSync(0, "utf8") || "{}").replace(/^\uFEFF+/, "")); } catch { input = {}; }
 const sessionId = input.session_id || "nosession";
 const cwd = input.cwd || process.cwd();
 // //// /读取 Stop hook 输入 ////
 
-// //// 用 git 取本回合改动文件列表，无源码改动则放行 [@380kkm 2026-06-15] ////
-// 源码扩展名白名单：排除纯文档、图片等，只关心代码改动
+// //// 防续写循环:本次停止由 hook 续写引发时直接放行 [@380kkm 2026-07-09] ////
+if (input.stop_hook_active) allow();
+// //// /防续写循环 ////
+
+// //// 用 git 取本回合改动文件列表,无源码改动则放行 [@380kkm 2026-06-15] ////
+// 源码扩展名白名单:排除纯文档,图片等,只关心代码改动
 const SRC_EXTS = new Set([
   ".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx",
   ".py", ".rb", ".go", ".rs", ".java", ".c", ".cpp", ".h", ".cs",
@@ -55,7 +62,7 @@ const diffNames = spawnSync("git", ["diff", "--name-only", "HEAD"], {
   encoding: "utf8",
   timeout: 10000,
 });
-// git 本身失败（非 git 仓库等）直接放行
+// git 本身失败(非 git 仓库等)直接放行
 if (diffNames.error || (diffNames.status !== 0 && diffNames.status !== 1)) allow();
 
 const trackedChanged = (diffNames.stdout || "")
@@ -76,14 +83,14 @@ const untrackedFiles = (untrackedRes.status === 0 ? untrackedRes.stdout || "" : 
 
 const allChanged = [...new Set([...trackedChanged, ...untrackedFiles])];
 
-// 只要有至少一个源码文件改动才继续；否则放行
+// 只要有至少一个源码文件改动才继续;否则放行
 const hasSrc = allChanged.some(isSrcFile);
 if (!hasSrc) allow();
 
-// //// cleanaudit 预过滤：源码与文档在同一回合均已改动则跳过，省去模型审核 [@380kkm 2026-06-16] ////
+// //// cleanaudit 预过滤:源码与文档在同一回合均已改动则跳过,省去模型审核 [@380kkm 2026-06-16] ////
 if (planDimension("doc-sync", cwd) === "skip") allow();
 // //// /cleanaudit 预过滤 ////
-// //// /用 git 取本回合改动文件列表，无源码改动则放行 ////
+// //// /用 git 取本回合改动文件列表,无源码改动则放行 ////
 
 // //// 组装传给审计器的完整 diff [@380kkm 2026-06-15] ////
 // 已跟踪文件用 git diff HEAD
@@ -96,7 +103,8 @@ const trackedDiffRes = spawnSync("git", ["diff", "HEAD"], {
 let diffContent = (trackedDiffRes.status === 0 ? trackedDiffRes.stdout || "" : "");
 
 // 未跟踪文件直接读内容附在后面
-const MAX_UNTRACKED_BYTES = 256 * 1024;   // 单文件上限，防止超大文件超出 buffer 上限
+// 限制单个未跟踪文件的读取字节数.
+const MAX_UNTRACKED_BYTES = 256 * 1024;
 let untrackedContent = "";
 for (const rel of untrackedFiles) {
   const abs = path.join(cwd, rel);
@@ -108,13 +116,14 @@ for (const rel of untrackedFiles) {
   } catch { /* 读不到就跳过 */ }
 }
 const fullDiff = diffContent + untrackedContent;
+const modelDiff = truncateModelInput(fullDiff, MAX_MODEL_INPUT_CHARS);
 
 // diff 为空则无需审计
 if (!fullDiff.trim()) allow();
 // //// /组装传给审计器的完整 diff ////
 
-// //// 重试计数（防止阻断死循环） [@380kkm 2026-06-15] ////
-const countFile = path.join(os.tmpdir(), `claude-doc-sync-${sessionId}.count`);
+// //// 重试计数(防止阻断死循环) [@380kkm 2026-06-15] ////
+const countFile = path.join(os.tmpdir(), `codex-doc-sync-${sessionId}.count`);
 const getCount = () => { try { return parseInt(fs.readFileSync(countFile, "utf8"), 10) || 0; } catch { return 0; } };
 const setCount = (n) => { try { fs.writeFileSync(countFile, String(n)); } catch { /* 忽略 */ } };
 // //// /重试计数 ////
@@ -137,13 +146,12 @@ const RUBRIC = `你是一个独立的文档同步审计器。你会收到一次�
 {"pass": false, "issues": ["文件X的头块说端口是6000但代码改为6080", "..."]}`;
 // //// /构造审计评判提示词 ////
 
-// //// 启动独立 claude 进程进行审计并解析裁决 [@380kkm 2026-06-15] ////
+// //// 启动独立 codex 子进程进行审计并解析裁决 [@380kkm 2026-06-15] ////
 let verdict = null;
-const res = spawnSync("claude -p --model sonnet", {
-  input: `${RUBRIC}\n\n====== 本次改动 diff ======\n${fullDiff}`,
-  shell: true,
-  cwd: os.tmpdir(),                                        // 隔离：临时目录，无项目上下文
-  env: { ...process.env, CLAUDE_HOOK_NESTED: "1" },        // 标记嵌套，避免递归审计
+const res = runReadOnlyAuditCodex({
+  input: `${RUBRIC}\n\n====== 本次改动 diff ======\n${modelDiff}`,
+  // 使用临时目录, 不加载当前项目上下文.
+  cwd: os.tmpdir(),
   encoding: "utf8",
   timeout: 100000,
   maxBuffer: 16 * 1024 * 1024,
@@ -152,12 +160,12 @@ if (res.status === 0 && !res.error && res.stdout) {
   const m = res.stdout.match(/\{[\s\S]*\}/);
   if (m) { try { verdict = JSON.parse(m[0]); } catch { verdict = null; } }
 }
-// 解析失败、报错、超时或 pass 非布尔一律放行
+// 解析失败,报错,超时或 pass 非布尔一律放行
 if (!verdict || typeof verdict.pass !== "boolean") {
   setCount(0);
   allow({ systemMessage: "文档同步审计未能运行或返回无法解析，本次已放行。" });
 }
-// //// /启动独立 claude 进程进行审计并解析裁决 ////
+// //// /启动独立 codex 子进程进行审计并解析裁决 ////
 
 // //// 追加审计记录到 archive/doc-sync-audit.md [@380kkm 2026-06-15] ////
 try {

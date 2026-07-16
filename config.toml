@@ -1,0 +1,11 @@
+[agents]
+max_threads = 6
+max_depth = 1
+
+[agents.cleantools-scout]
+description = "只读定位侦察 agent, 使用 cleanread 与 cleanscan 产出 path:line 锚点地图."
+config_file = "./agents/cleantools-scout.toml"
+nickname_candidates = [
+    "Clean Scout",
+    "Anchor Scout",
+]

@@ -52,7 +52,9 @@ Shapes, tier by tier:
   only where the token's role is invisible yet verifiable from adjacent
   code.
 - Unit marker: `//// <做什么> [@user 日期] ////` (after the comment leader)
-  above every unit reaching one testable goal. A block unit is wrapped:
+  above every unit reaching one testable goal; `@user` is the current
+  repo's resolved `git config user.name` — the remote-conditional includes
+  in `~/.gitconfig` are its single home. A block unit is wrapped:
   the marker *above* its first line, `//// /<做什么> ////` *below* its last.
 - These two are the only comment tiers, nothing between them; each is one
   line directly above its code — the block closer, below, is the sole
@@ -127,7 +129,7 @@ when refactoring.
 
 ## Admission
 
-- `README` (what-this-is, how-to-run) and this `CLAUDE.md` (how-to-act-here)
+- `README` (what-this-is, how-to-run) and this `AGENTS.md` (how-to-act-here)
   are the only presumed residents; a constraint set splits out only to
   spare this file a second reason to change; a module
   never gets its own `.md` — its doc is its core file's head block.
@@ -148,9 +150,9 @@ when refactoring.
   `audience: external`, `//// ////` units, commit messages; a machine fact
   copies verbatim from its single home; a source gap halts extraction.
 <!-- plain:start -->
-- The Chinese view keeps English identifiers and established terms in
-  backticks; one fact, one active sentence; full-width Chinese marks, one
-  space between Chinese and Latin runs: 重试 3 次后调用 `retry()`。
+- All prose uses half-width ASCII punctuation and symbols regardless of
+  language; one fact, one active sentence; one space between Chinese and
+  Latin runs: 重试 3 次后调用 retry().
   Translationese and marketing words: delete on sight.
 <!-- plain:end -->
 
@@ -187,12 +189,14 @@ when refactoring.
 
 <!-- presession:start -->
 
-- A substantive modification task runs as a Workflow; trivial or
-  conversational turns run solo.
-- Judgment agents — orchestration, adversarial verify, judge panels, final
-  synthesis — use model `opus` at effort `max`; execution agents — scouting,
-  mechanical extraction, per-file reads, the Stop audit hooks — use model
-  `sonnet`. Audit agents diagnose only, never edit.
+- For a substantive modification task, the main Codex thread explicitly
+  orchestrates subagents when scouting, parallel reading, or independent audit
+  helps; trivial or conversational turns run solo.
+- Judgment agents handle orchestration, adversarial verification, judge panels,
+  and final synthesis. Execution agents handle scouting, mechanical extraction,
+  and per-file reads. Use the current Codex model configuration unless a custom
+  agent file states a narrower tool or sandbox boundary. Audit agents diagnose
+  only, never edit.
 - A failed audit loops to a fix round, then re-audit, until clean or the
   round cap hits.
 
@@ -200,7 +204,11 @@ when refactoring.
 
 <!-- presubmit:start -->
 
-- 读参考、确认项目内容时，先单独跑一个侦察 workflow 再开正常并行：`Workflow` 调 `scout-first-read`，传 `args: { goal, root, subtasks }`；scout 只读定位产 `path:line` 锚点地图，fan 按 `subtasks` 并行精读、各自回带锚点的答案，据此再开正常并行 workflow。
+- 读参考、确认项目内容时，主线程先显式 spawn 一个只读
+  `cleantools-scout` subagent，传目标、项目根和需要定位的问题；scout 只用
+  cleanread 与 cleanscan 产 `path:line` 锚点地图。主线程拿到地图后，再按
+  `subtasks` 显式 fan-out 普通 worker subagents；每个 worker 先
+  `trace preflight` 复用 scout 的定位查询，再精读或执行自己的任务并回带锚点。
 
 <!-- presubmit:end -->
 

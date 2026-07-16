@@ -4,9 +4,9 @@
 仅在首次寻找特定的逆向依赖这一任务中禁用read和grep的子agent过量消费token。
 
 
-个人 Claude Code 配置：写作规范、每轮结束后的审计 hook、读码工具 cleanread、cleanscan、cleanaudit，以及侦察先行的子 agent 编排（`agents/` 与 `workflows/`）。不是插件，放进 `~/.claude/`（或项目 `.claude/`）即用。
+个人 Codex 配置: 写作规范, 每轮结束后的审计 hook, 读码工具 cleanread, cleanscan, cleanaudit, 以及侦察先行的子 agent 编排 (`AGENTS.md`, `agents/` 与 `hooks.json`). 不是插件, 将 `AGENTS.md`, `hooks.json`, `agents/`, `hooks/`, `skills/` 与 `tools/` 放进 `~/.codex/` (或项目 `.codex/`) 即可使用.
 
-迁移到本机只改一处：把 `settings.json` 里各 hook 的绝对路径换成本机路径。
+迁移到本机时保留现有 `~/.codex/config.toml`, 仅合并本仓库 `config.toml` 的 `[agents]` 配置; 再把 `hooks.json` 内各 hook 的绝对路径换成本机路径.
 
 运行前提：`uv`、`git`、Node.js。命令清单见 `skills/clean-tools/SKILL.md`。
 

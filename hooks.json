@@ -1,0 +1,125 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"C:\\Users\\380kk\\.codex\\hooks\\session-start-reminders.mjs\"",
+            "timeout": 15,
+            "statusMessage": "加载会话规则"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"C:\\Users\\380kk\\.codex\\hooks\\drift-record.mjs\"",
+            "timeout": 10,
+            "statusMessage": "记录会话回顾"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"C:\\Users\\380kk\\.codex\\hooks\\explore-nudge.mjs\"",
+            "timeout": 10,
+            "statusMessage": "加载探索规则"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|shell_command",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"C:\\Users\\380kk\\.codex\\hooks\\preread-reminder.mjs\"",
+            "timeout": 15,
+            "statusMessage": "读码规则提醒"
+          }
+        ]
+      },
+      {
+        "matcher": "apply_patch|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"C:\\Users\\380kk\\.codex\\hooks\\standards-reminder.mjs\"",
+            "timeout": 15,
+            "statusMessage": "写作标准提醒"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"C:\\Users\\380kk\\.codex\\hooks\\stop-reminders.mjs\"",
+            "timeout": 15,
+            "statusMessage": "收尾检查"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"C:\\Users\\380kk\\.codex\\hooks\\comment-test-probe.mjs\"",
+            "timeout": 360,
+            "statusMessage": "注释一致性测试中..."
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"C:\\Users\\380kk\\.codex\\hooks\\jargon-audit.mjs\"",
+            "timeout": 240,
+            "statusMessage": "黑话审计中..."
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"C:\\Users\\380kk\\.codex\\hooks\\doc-sync-audit.mjs\"",
+            "timeout": 240,
+            "statusMessage": "文档同步核对..."
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"C:\\Users\\380kk\\.codex\\hooks\\drift-compact.mjs\"",
+            "timeout": 140,
+            "statusMessage": "维护会话回顾..."
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"C:\\Users\\380kk\\.codex\\hooks\\style-rewrite-inject.mjs\"",
+            "timeout": 600,
+            "statusMessage": "文风改写流水线..."
+          }
+        ]
+      }
+    ]
+  }
+}

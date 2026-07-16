@@ -41,6 +41,6 @@ description: 读码、查依赖、回合末审计的本地工具族（cleanread 
 
 ## 安装（@ agent 即可，无需另装 CLI app）
 
-把本仓库的 `hooks/`、`skills/`、`agents/`、`workflows/`、`settings.json`、`CLAUDE.md` 放进 `~/.claude/`（或项目 `.claude/`）；
-按机器改 `settings.json` 里 hooks 的绝对路径；`tools/` 随仓库走。需 `uv` 与 `git`。
-侦察先行的子 agent 编排见 `CLAUDE.md` 的 Agent Orchestration 段：只读侦察子 agent `agents/cleantools-scout.md`，可复用模板 `workflows/scout-first-read.js`。
+把本仓库的 `hooks/`, `skills/`, `agents/`, `hooks.json`, `AGENTS.md` 放进 `~/.codex/` (或项目 `.codex/`).
+把 `config.toml` 的 `[agents]` 配置合并进现有文件, 按机器修改 `hooks.json` 里的 hooks 绝对路径; `tools/` 随仓库走. 需 `uv` 与 `git`.
+侦察先行的子 agent 编排见 `AGENTS.md` 的 Agent Orchestration 段, 只读侦察子 agent 使用 `agents/cleantools-scout.toml`.

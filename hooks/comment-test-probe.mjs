@@ -1,36 +1,44 @@
 // audience: internal
 // # comment-test-probe-hook
-// 阻塞型 Stop hook：验证本回合改动的代码与其注释是否一致。
-// 把注释当规格，启动一个独立 claude 进程设计并执行一次性单元测试；测后即弃，不纳入项目正式测试套件。
-// 运行前提：PATH 上有 claude CLI；被测项目可在 cwd 下正常调用。
-// 不变量一：嵌套 claude 进程（CLAUDE_HOOK_NESTED=1）直接放行，断开递归。
-// 不变量二：验证器报错、超时或无法解析时一律放行（fail-open），绝不因验证器自身故障卡死会话。
-// 不变量三：同一回合最多打断 MAX_BLOCKS 次，超出就放行，防止 block 死循环。
+// Stop hook 验证本回合改动的代码与注释是否一致.
+// hook 启动独立 Codex 子进程设计并执行一次性单元测试.
+// 一次性测试不进入项目正式测试套件.
+// PATH 上必须存在 codex CLI. 被测项目必须能在 cwd 下运行.
+// CODEX_HOOK_NESTED=1 时直接放行.
+// 验证器报错, 超时或返回无效结果时直接放行.
+// stop_hook_active 为真时直接放行.
+// 同一回合最多请求续写 MAX_BLOCKS 次.
 
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { planDimension, boundedContext } from "./lib/cleanaudit-bridge.mjs";
+import { runCommentTestCodex, truncateModelInput } from "./lib/nested-codex.mjs";
 
-const MAX_BLOCKS = 1;    // 每条回复最多 block 一次
+const MAX_BLOCKS = 1;
+const MAX_MODEL_INPUT_CHARS = 96_000;
 
-// 输出 hook JSON 并放行退出。
+// 输出 hook JSON 并放行退出.
 function allow(extra) {
   process.stdout.write(JSON.stringify(extra ?? {}));
   process.exit(0);
 }
 
-// //// 防递归：嵌套 claude 进程直接放行 [@380kkm 2026-06-15] ////
-if (process.env.CLAUDE_HOOK_NESTED === "1") allow();
-// //// /防递归：嵌套 claude 进程直接放行 ////
+// //// 防递归:嵌套 codex 子进程直接放行 [@380kkm 2026-06-15] ////
+if (process.env.CODEX_HOOK_NESTED === "1") allow();
+// //// /防递归:嵌套 codex 子进程直接放行 ////
 
 // //// 读取 Stop hook 输入 [@380kkm 2026-06-15] ////
 let input = {};
-try { input = JSON.parse(fs.readFileSync(0, "utf8") || "{}"); } catch { input = {}; }
+try { input = JSON.parse((fs.readFileSync(0, "utf8") || "{}").replace(/^\uFEFF+/, "")); } catch { input = {}; }
 const sessionId = input.session_id || "nosession";
 const cwd = input.cwd || process.cwd();
 // //// /读取 Stop hook 输入 ////
+
+// //// 防续写循环:本次停止由 hook 续写引发时直接放行 [@380kkm 2026-07-09] ////
+if (input.stop_hook_active) allow();
+// //// /防续写循环 ////
 
 // //// 定义合法源码扩展名集合 [@380kkm 2026-06-15] ////
 const SRC_EXTS = new Set([
@@ -57,14 +65,14 @@ function runGit(args) {
 }
 
 const diffOut = runGit(["diff", "--name-only", "HEAD"]);
-// git 命令失败视为非 git 仓库，直接放行
+// git 命令失败视为非 git 仓库,直接放行
 if (diffOut === null) allow();
 
 const statusOut = runGit(["status", "--porcelain"]) || "";
 
 const diffFiles = diffOut.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
 
-// 取未跟踪文件（?? 行）
+// 取未跟踪文件(?? 行)
 const untrackedFiles = statusOut
   .split(/\r?\n/)
   .filter(l => l.startsWith("??"))
@@ -73,17 +81,17 @@ const untrackedFiles = statusOut
 const allChanged = [...new Set([...diffFiles, ...untrackedFiles])];
 const srcFiles = allChanged.filter(isSrcFile);
 
-// 没有源码改动则直接放行，不启动 claude 进程
+// 没有源码改动则直接放行,不启动 codex 子进程
 if (srcFiles.length === 0) allow();
 // //// /用 git 取本回合改动的源码文件列表 ////
 
-// //// cleanaudit 预过滤：本回合无改动符号则跳过，不启动 claude 进程设计并运行测试 [@380kkm 2026-06-16] ////
+// //// cleanaudit 预过滤:本回合无改动符号则跳过,不启动 codex 子进程设计并运行测试 [@380kkm 2026-06-16] ////
 if (planDimension("comment", cwd) === "skip") allow();
 // //// /cleanaudit 预过滤 ////
 
-// //// 取验证上下文：优先用 cleanaudit 改动符号的有界片段，取不到则回退到完整 git diff [@380kkm 2026-06-16] ////
-// 注释一致性验证的目标是「函数现在是否做到注释所说」，需要符号的完整当前源码而非改动增量，
-// 故优先用 cleanaudit context（只含被改符号、完整且有界），取不到再回退整份 diff。
+// //// 取验证上下文:优先用 cleanaudit 改动符号的有界片段,取不到则回退到完整 git diff [@380kkm 2026-06-16] ////
+// 注释一致性验证的目标是"函数现在是否做到注释所说",需要符号的完整当前源码而非改动增量,
+// 故优先用 cleanaudit context(只含被改符号,完整且有界),取不到再回退整份 diff.
 const bounded = boundedContext("comment", cwd);
 let auditMaterial, materialLabel;
 if (bounded) {
@@ -99,17 +107,18 @@ if (bounded) {
   auditMaterial = (diffTextRes.status === 0 && !diffTextRes.error) ? (diffTextRes.stdout || "") : "";
   materialLabel = "git diff";
 }
+auditMaterial = truncateModelInput(auditMaterial, MAX_MODEL_INPUT_CHARS);
 // //// /取验证上下文 ////
 
-// //// 重试计数（防 block 死循环） [@380kkm 2026-06-15] ////
-const countFile = path.join(os.tmpdir(), `claude-cmt-probe-${sessionId}.count`);
+// //// 重试计数(防 block 死循环) [@380kkm 2026-06-15] ////
+const countFile = path.join(os.tmpdir(), `codex-cmt-probe-${sessionId}.count`);
 const getCount = () => {
   try { return parseInt(fs.readFileSync(countFile, "utf8"), 10) || 0; } catch { return 0; }
 };
 const setCount = (n) => {
   try { fs.writeFileSync(countFile, String(n)); } catch { /* 忽略 */ }
 };
-// //// /重试计数（防 block 死循环） ////
+// //// /重试计数(防 block 死循环) ////
 
 // //// 组装验证提示词与验证上下文 [@380kkm 2026-06-15] ////
 const RUBRIC = `你是独立的代码-注释一致性验证器。
@@ -133,13 +142,11 @@ ${srcFiles.join("\n")}
 ${auditMaterial || "（上下文为空或无法获取）"}`;
 // //// /组装验证提示词与验证上下文 ////
 
-// //// 启动独立 claude 进程验证，解析判定结果 [@380kkm 2026-06-15] ////
+// //// 启动独立 codex 子进程验证,解析判定结果 [@380kkm 2026-06-15] ////
 let verdict = null;
-const res = spawnSync("claude -p --model sonnet", {
+const res = runCommentTestCodex({
   input: RUBRIC,
-  shell: true,
   cwd,
-  env: { ...process.env, CLAUDE_HOOK_NESTED: "1" },
   encoding: "utf8",
   timeout: 170000,
   maxBuffer: 16 * 1024 * 1024,
@@ -151,7 +158,7 @@ if (res.status === 0 && !res.error && res.stdout) {
     try { verdict = JSON.parse(m[0]); } catch { verdict = null; }
   }
 }
-// //// /启动独立 claude 进程验证，解析判定结果 ////
+// //// /启动独立 codex 子进程验证,解析判定结果 ////
 
 // //// 记录判定结果到 archive/comment-test-probe.md [@380kkm 2026-06-15] ////
 try {
@@ -180,7 +187,7 @@ try {
 // //// /记录判定结果到 archive/comment-test-probe.md ////
 
 // //// 据判定结果决定放行或打断 [@380kkm 2026-06-15] ////
-// 解析失败、claude 报错、超时、pass 非布尔时，一律 fail-open 放行。
+// 解析失败,codex 子进程报错,超时,pass 非布尔时,一律 fail-open 放行.
 if (!verdict || typeof verdict.pass !== "boolean") {
   setCount(0);
   allow({ systemMessage: "代码-注释一致性验证未能运行或返回无法解析，本次已放行。" });
