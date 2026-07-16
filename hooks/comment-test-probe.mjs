@@ -96,7 +96,7 @@ const bounded = boundedContext("comment", cwd);
 let auditMaterial, materialLabel;
 if (bounded) {
   auditMaterial = bounded;
-  materialLabel = "改动符号的完整源码（有界）";
+  materialLabel = "改动符号的完整源码(有界)";
 } else {
   const diffTextRes = spawnSync("git", ["diff", "HEAD", "--", ...srcFiles], {
     cwd,
@@ -121,25 +121,25 @@ const setCount = (n) => {
 // //// /重试计数(防 block 死循环) ////
 
 // //// 组装验证提示词与验证上下文 [@380kkm 2026-06-15] ////
-const RUBRIC = `你是独立的代码-注释一致性验证器。
+const RUBRIC = `你是独立的代码-注释一致性验证器.
 
-工作规程：
-1. 阅读下方改动文件列表与改动单元的源码，找出所有已注释的代码单元（函数、方法、类、模块）。
-2. 对每个能被单独执行、副作用可控的单元，把其注释当作规格，设计最小单元测试；测试当且仅当代码确实做到注释所说时通过。
-3. 把测试文件写到项目根目录下的 archive/ 子目录（若不存在则创建），文件名任意；跑完立即视为一次性产物，不将其纳入项目正式测试套件，不修改任何项目源码。
-4. 运行测试，收集结果。
-5. 只报告可复现的代码与注释矛盾；无法安全测试（副作用不可控、外部依赖缺失等）的单元跳过，不算矛盾。
+工作规程:
+1. 阅读下方改动文件列表与改动单元的源码,找出所有已注释的代码单元(函数,方法,类,模块).
+2. 对每个能被单独执行,副作用可控的单元,把其注释当作规格,设计最小单元测试;测试当且仅当代码确实做到注释所说时通过.
+3. 把测试文件写到项目根目录下的 archive/ 子目录(若不存在则创建),文件名任意;跑完立即视为一次性产物,不将其纳入项目正式测试套件,不修改任何项目源码.
+4. 运行测试,收集结果.
+5. 只报告可复现的代码与注释矛盾;无法安全测试(副作用不可控,外部依赖缺失等)的单元跳过,不算矛盾.
 
-只输出一个 JSON 对象，不要任何其它文字、不要代码块围栏：
+只输出一个 JSON 对象,不要任何其它文字,不要代码块围栏:
 {"pass":true,"mismatches":[]}
 或
-{"pass":false,"mismatches":["单元名：注释说…，实测…"]}
+{"pass":false,"mismatches":["单元名:注释说...,实测..."]}
 
 ====== 改动源码文件列表 ======
 ${srcFiles.join("\n")}
 
 ====== ${materialLabel} ======
-${auditMaterial || "（上下文为空或无法获取）"}`;
+${auditMaterial || "(上下文为空或无法获取)"}`;
 // //// /组装验证提示词与验证上下文 ////
 
 // //// 启动独立 codex 子进程验证,解析判定结果 [@380kkm 2026-06-15] ////
@@ -170,14 +170,14 @@ try {
     : verdict.pass === true ? "通过" : "未通过";
   const mismatches = verdict && Array.isArray(verdict.mismatches) && verdict.mismatches.length
     ? verdict.mismatches.map(s => `- ${s}`).join("\n")
-    : "（无）";
+    : "(无)";
   const record = [
     `# comment-test-probe 裁决留痕`,
     ``,
-    `时间：${ts}`,
-    `会话：${sessionId}`,
-    `改动文件：${srcFiles.join(", ")}`,
-    `裁决：${passLabel}`,
+    `时间:${ts}`,
+    `会话:${sessionId}`,
+    `改动文件:${srcFiles.join(", ")}`,
+    `裁决:${passLabel}`,
     ``,
     `## 矛盾点`,
     mismatches,
@@ -190,7 +190,7 @@ try {
 // 解析失败,codex 子进程报错,超时,pass 非布尔时,一律 fail-open 放行.
 if (!verdict || typeof verdict.pass !== "boolean") {
   setCount(0);
-  allow({ systemMessage: "代码-注释一致性验证未能运行或返回无法解析，本次已放行。" });
+  allow({ systemMessage: "代码-注释一致性验证未能运行或返回无法解析,本次已放行." });
 }
 
 if (verdict.pass === true) {
@@ -205,20 +205,20 @@ const mismatches = Array.isArray(verdict.mismatches) && verdict.mismatches.lengt
 
 if (!mismatches) {
   setCount(0);
-  allow({ systemMessage: "代码-注释一致性验证返回 pass:false 但未给出矛盾详情，本次已放行。" });
+  allow({ systemMessage: "代码-注释一致性验证返回 pass:false 但未给出矛盾详情,本次已放行." });
 }
 
 const n = getCount() + 1;
 if (n > MAX_BLOCKS) {
   setCount(0);
-  allow({ systemMessage: `代码-注释一致性验证已打断 ${MAX_BLOCKS} 次，已放行，请人工复核矛盾点（见 archive/comment-test-probe.md）。` });
+  allow({ systemMessage: `代码-注释一致性验证已打断 ${MAX_BLOCKS} 次,已放行,请人工复核矛盾点(见 archive/comment-test-probe.md).` });
 }
 setCount(n);
 
 const mismatchLines = mismatches.map(s => `- ${s}`).join("\n");
 process.stdout.write(JSON.stringify({
   decision: "block",
-  reason: `代码与注释存在矛盾（第 ${n}/${MAX_BLOCKS} 次打断），请修正代码或注释使二者一致后重新提交：\n${mismatchLines}`,
+  reason: `代码与注释存在矛盾(第 ${n}/${MAX_BLOCKS} 次打断),请修正代码或注释使二者一致后重新提交:\n${mismatchLines}`,
 }));
 process.exit(0);
 // //// /据判定结果决定放行或打断 ////

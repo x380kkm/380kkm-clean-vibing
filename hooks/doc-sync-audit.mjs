@@ -129,18 +129,18 @@ const setCount = (n) => { try { fs.writeFileSync(countFile, String(n)); } catch 
 // //// /重试计数 ////
 
 // //// 构造审计评判提示词 [@380kkm 2026-06-15] ////
-const RUBRIC = `你是一个独立的文档同步审计器。你会收到一次代码改动的完整 diff（含未跟踪新文件内容）。
-你的唯一任务：判断这次改动里有没有"代码改了，但对应文件的头块注释（file-head block）或相关文档未同步，导致文档与代码矛盾"的情况。
+const RUBRIC = `你是一个独立的文档同步审计器.你会收到一次代码改动的完整 diff(含未跟踪新文件内容).
+你的唯一任务:判断这次改动里有没有"代码改了,但对应文件的头块注释(file-head block)或相关文档未同步,导致文档与代码矛盾"的情况.
 
-判定标准（只看这一点，不评判其它）：
-- 若某个源码文件的内容（函数签名、行为、模块名、接口、端口、路径、常量、依赖等）在 diff 中发生了变化，
-  而该文件头部注释中对应的陈述仍是旧的、与新代码矛盾，算不通过。
-- 若相关 .md 文档（如 api.md、architecture.md、README 等）在 diff 中出现，但其内容与同次 diff 里的代码改动矛盾，也算不通过。
-- 若代码改动了但其文件根本没有头块，或头块里没有提到该事实，则视为"无矛盾"，不算不通过。
-- 只要文档和代码之间没有矛盾（即使文档不完整），就算通过。
-- 不评判代码正确性、风格、遗漏功能或其它，只看文档与代码的矛盾。
+判定标准(只看这一点,不评判其它):
+- 若某个源码文件的内容(函数签名,行为,模块名,接口,端口,路径,常量,依赖等)在 diff 中发生了变化,
+  而该文件头部注释中对应的陈述仍是旧的,与新代码矛盾,算不通过.
+- 若相关 .md 文档(如 api.md,architecture.md,README 等)在 diff 中出现,但其内容与同次 diff 里的代码改动矛盾,也算不通过.
+- 若代码改动了但其文件根本没有头块,或头块里没有提到该事实,则视为"无矛盾",不算不通过.
+- 只要文档和代码之间没有矛盾(即使文档不完整),就算通过.
+- 不评判代码正确性,风格,遗漏功能或其它,只看文档与代码的矛盾.
 
-只输出一个 JSON 对象，不要任何其它文字、不要代码块围栏：
+只输出一个 JSON 对象,不要任何其它文字,不要代码块围栏:
 {"pass": true, "issues": []}
 或
 {"pass": false, "issues": ["文件X的头块说端口是6000但代码改为6080", "..."]}`;
@@ -163,7 +163,7 @@ if (res.status === 0 && !res.error && res.stdout) {
 // 解析失败,报错,超时或 pass 非布尔一律放行
 if (!verdict || typeof verdict.pass !== "boolean") {
   setCount(0);
-  allow({ systemMessage: "文档同步审计未能运行或返回无法解析，本次已放行。" });
+  allow({ systemMessage: "文档同步审计未能运行或返回无法解析,本次已放行." });
 }
 // //// /启动独立 codex 子进程进行审计并解析裁决 ////
 
@@ -174,7 +174,7 @@ try {
   const stamp = new Date().toISOString();
   const issueLines = Array.isArray(verdict.issues) && verdict.issues.length
     ? verdict.issues.map(s => `- ${s}`).join("\n")
-    : "（无）";
+    : "(无)";
   const entry = `\n## ${stamp}  session=${sessionId}\npass=${verdict.pass}\n${issueLines}\n`;
   fs.appendFileSync(path.join(archiveDir, "doc-sync-audit.md"), entry, "utf8");
 } catch { /* 追加记录失败不阻断裁决 */ }
@@ -189,17 +189,17 @@ if (verdict.pass) {
 const issues = Array.isArray(verdict.issues) && verdict.issues.length ? verdict.issues : null;
 if (!issues) {
   setCount(0);
-  allow({ systemMessage: "文档同步审计返回 pass=false 但未给出具体问题，已放行。" });
+  allow({ systemMessage: "文档同步审计返回 pass=false 但未给出具体问题,已放行." });
 }
 const n = getCount() + 1;
 if (n > MAX_BLOCKS) {
   setCount(0);
-  allow({ systemMessage: `文档同步审计连续 ${MAX_BLOCKS} 次发现脱节，已放行，请人工补齐对应头块或文档。` });
+  allow({ systemMessage: `文档同步审计连续 ${MAX_BLOCKS} 次发现脱节,已放行,请人工补齐对应头块或文档.` });
 }
 setCount(n);
 const issueText = issues.map(s => `- ${s}`).join("\n");
 allow({
   decision: "block",
-  reason: `文档同步审计发现代码与文档矛盾（第 ${n}/${MAX_BLOCKS} 次）。请在本次改动中同步更新对应文件的头块注释或相关文档，使文档与代码保持一致，再结束本回合：\n${issueText}`,
+  reason: `文档同步审计发现代码与文档矛盾(第 ${n}/${MAX_BLOCKS} 次).请在本次改动中同步更新对应文件的头块注释或相关文档,使文档与代码保持一致,再结束本回合:\n${issueText}`,
 });
 // //// /据裁决决定放行或打断 ////

@@ -139,29 +139,29 @@ const setCount = (n) => { try { fs.writeFileSync(countFile, String(n)); } catch 
 
 // //// 词典扫描:确定性列出本项目常见黑话,稍后与模型结果合并成一份清单 [@380kkm 2026-07-07] ////
 // 此处不打断:先扫词典,再跑模型审词典外的新黑话,两份合并后一次性给完整清单,避免分两轮打断.
-const lexIssues = scanJargon(diff).map(h => `"${h.term}" -> ${h.good}（见：${h.sample}）`);
+const lexIssues = scanJargon(diff).map(h => `"${h.term}" -> ${h.good}(见:${h.sample})`);
 // //// /词典扫描:确定性列出本项目常见黑话 ////
 
-const RUBRIC = `你是一个代码黑话审计器。只判断以下 diff 里新增的注释和标识符命名有没有"黑话"。
+const RUBRIC = `你是一个代码黑话审计器.只判断以下 diff 里新增的注释和标识符命名有没有"黑话".
 
-黑话定义（满足任意一条即算黑话）：
-1. 生造代号：自造的简写或符号，在整个 diff 范围内首次出现时没有任何解释（哪怕半句也算）。
-2. 未解释缩写：行业外不通用的缩写（如 FCS、TSK、PMR），且首次出现时没有展开或说明。
-3. 内部暗语：仅靠内部约定才能理解的词，读者无法从上下文或命名本身推断含义。
-4. 中文注释里的不平直表达：把普通动作/状态/关系说成比喻（如"回落""烧进""接线"）、
-   拟人（让代码/函数/文件"认识/知道/回答"）、口语缩略（如"跑对应 JSON""装 0xA9"）、
-   颜色喻状态（如"全绿"喻测试通过）、生造压缩（把多词压成单字或拼接）。改成平直技术陈述。
+黑话定义(满足任意一条即算黑话):
+1. 生造代号:自造的简写或符号,在整个 diff 范围内首次出现时没有任何解释(哪怕半句也算).
+2. 未解释缩写:行业外不通用的缩写(如 FCS,TSK,PMR),且首次出现时没有展开或说明.
+3. 内部暗语:仅靠内部约定才能理解的词,读者无法从上下文或命名本身推断含义.
+4. 中文注释里的不平直表达:把普通动作/状态/关系说成比喻(如"回落""烧进""接线"),
+   拟人(让代码/函数/文件"认识/知道/回答"),口语缩略(如"跑对应 JSON""装 0xA9"),
+   颜色喻状态(如"全绿"喻测试通过),生造压缩(把多词压成单字或拼接).改成平直技术陈述.
 
-以下确立术语与字面词不算黑话，出现时不要 flag：${KEEP.join("、")}。
+以下确立术语与字面词不算黑话,出现时不要 flag:${KEEP.join(",")}.
 
-不属于黑话（不要误判）：
-- 通用编程术语（如 fn、ctx、req、res、idx、tmp、err、cb、args、opts、buf、num、str、len、id、db、api、url、http、json、sql）。
-- 语言/框架的惯用缩写（如 async/await、impl、proto、config、schema、spec、env、cli、cwd、os、fs、path）。
-- 数学/算法标准符号（如 i、j、k、n、x、y、z）。
-- 中文注释里有完整词义的中文词。
-- 在同一 diff 中同一文件内首次出现时已有解释的任何缩写。
+不属于黑话(不要误判):
+- 通用编程术语(如 fn,ctx,req,res,idx,tmp,err,cb,args,opts,buf,num,str,len,id,db,api,url,http,json,sql).
+- 语言/框架的惯用缩写(如 async/await,impl,proto,config,schema,spec,env,cli,cwd,os,fs,path).
+- 数学/算法标准符号(如 i,j,k,n,x,y,z).
+- 中文注释里有完整词义的中文词.
+- 在同一 diff 中同一文件内首次出现时已有解释的任何缩写.
 
-只输出一个 JSON 对象，不要任何其它文字，不要代码块围栏：
+只输出一个 JSON 对象,不要任何其它文字,不要代码块围栏:
 {"pass": true, "issues": []}
 或
 {"pass": false, "issues": ["具体黑话词及所在位置", "..."]}`;
@@ -192,19 +192,19 @@ const llmIssues = (llmOk && verdict.pass === false && Array.isArray(verdict.issu
 const allIssues = [...lexIssues, ...llmIssues];
 if (allIssues.length === 0) {
   setCount(0);
-  allow(llmOk ? {} : { systemMessage: "黑话审计的模型部分未能运行，仅词典扫描已通过。" });
+  allow(llmOk ? {} : { systemMessage: "黑话审计的模型部分未能运行,仅词典扫描已通过." });
 }
 
 const n = getCount() + 1;
 if (n > MAX_BLOCKS) {
   setCount(0);
-  allow({ systemMessage: `黑话审计连续 ${MAX_BLOCKS} 次未通过，已放行，请人工复核改动中的命名。` });
+  allow({ systemMessage: `黑话审计连续 ${MAX_BLOCKS} 次未通过,已放行,请人工复核改动中的命名.` });
 }
 setCount(n);
 
 const issueList = allIssues.map(s => `- ${s}`).join("\n");
 allow({
   decision: "block",
-  reason: `黑话审计未通过（第 ${n}/${MAX_BLOCKS} 次）。下面是本回合新增注释/命名里扫出的全部黑话（词典命中在前，模型判定在后），请一次性改成平直说法或在首次出现处加半句解释：\n${issueList}`,
+  reason: `黑话审计未通过(第 ${n}/${MAX_BLOCKS} 次).下面是本回合新增注释/命名里扫出的全部黑话(词典命中在前,模型判定在后),请一次性改成平直说法或在首次出现处加半句解释:\n${issueList}`,
 });
 // //// /合并词典命中与模型结果,一次性给完整清单 ////
