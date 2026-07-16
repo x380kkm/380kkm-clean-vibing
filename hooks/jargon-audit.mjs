@@ -169,6 +169,7 @@ const RUBRIC = `你是一个代码黑话审计器.只判断以下 diff 里新增
 // //// 起独立 codex 子进程审计黑话,解析裁决 [@380kkm 2026-06-15] ////
 let verdict = null;
 const res = runReadOnlyAuditCodex({
+  hookInput: input,
   input: `${RUBRIC}\n\n====== diff 内容 ======\n${modelDiff}`,
   // 使用临时目录, 不加载当前项目上下文.
   cwd: os.tmpdir(),

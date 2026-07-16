@@ -126,6 +126,7 @@ if (original.length < MIN_CHARS || original.length > MAX_CHARS) emitAndExit();
 //// 起一个隔离的,无项目上下文的 codex 子进程;失败返回 null [@380kkm 2026-06-22] ////
 function runCodex(prompt) {
   const res = runReadOnlyAuditCodex({
+    hookInput: input,
     input: prompt,
     maxInputChars: 16_000,
     cwd: os.tmpdir(),

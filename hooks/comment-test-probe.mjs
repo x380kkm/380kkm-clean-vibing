@@ -145,6 +145,7 @@ ${auditMaterial || "(上下文为空或无法获取)"}`;
 // //// 启动独立 codex 子进程验证,解析判定结果 [@380kkm 2026-06-15] ////
 let verdict = null;
 const res = runCommentTestCodex({
+  hookInput: input,
   input: RUBRIC,
   cwd,
   encoding: "utf8",

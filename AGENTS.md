@@ -200,6 +200,9 @@ when refactoring.
 - Delegation depth is capped at 2 below the main thread: main thread depth 0,
   subagent depth 1, and tool agent depth 2. A depth-2 agent never calls
   `spawn_agent`.
+- Hooks running inside native subagent or tool agent threads never start a
+  hook agent. Only hooks confirmed to run in the main thread may start an
+  isolated Codex process.
 - The main thread always passes an explicit `wait_agent.timeout_ms`. The
   operational minimum is 20000, the default is 60000, and the maximum effective
   wait is 7200000. The maximum uses at most two consecutive 3600000 calls

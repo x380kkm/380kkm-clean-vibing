@@ -149,6 +149,7 @@ const RUBRIC = `你是一个独立的文档同步审计器.你会收到一次代
 // //// 启动独立 codex 子进程进行审计并解析裁决 [@380kkm 2026-06-15] ////
 let verdict = null;
 const res = runReadOnlyAuditCodex({
+  hookInput: input,
   input: `${RUBRIC}\n\n====== 本次改动 diff ======\n${modelDiff}`,
   // 使用临时目录, 不加载当前项目上下文.
   cwd: os.tmpdir(),

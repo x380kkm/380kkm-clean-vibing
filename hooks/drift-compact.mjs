@@ -119,6 +119,7 @@ function hasProjectPathAttribution(recap) {
 
 // //// 起子 agent 产出回顾;失败则保留旧回顾放行 [@380kkm 2026-06-15] ////
 const res = runRecapCodex({
+  hookInput: input,
   input: RUBRIC,
   maxInputChars: 32_000,
   // 使用临时目录, 不加载当前项目上下文.

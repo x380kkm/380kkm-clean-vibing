@@ -1,10 +1,13 @@
 // audience: internal
 // # nested-codex
 // hooks 通过本模块启动隔离的 Codex 子进程.
+// 只有 root thread hook 可以启动子进程.
+// Native subagent, tool agent 和无法识别的 thread 都返回跳过结果.
 // 所有嵌套任务使用 gpt-5.6-luna.
 // 注释一致性检查与对话回顾使用 xhigh. 其他只读审计使用 medium.
 // 子进程使用标准 service tier, 并关闭与任务无关的扩展功能.
 
+import fs from "node:fs";
 import { spawnSync } from "node:child_process";
 
 // //// 定义嵌套 `Codex` 的公共参数与任务模型 [@x380kkm 2026-07-15] ////
@@ -47,7 +50,66 @@ const READ_ONLY_AUDIT_MODEL = {
   projectDocMaxBytes: 0,
   sandboxMode: "read-only",
 };
+const SKIPPED_RESULT = Object.freeze({
+  status: 0,
+  signal: null,
+  stdout: "",
+  stderr: "",
+  error: undefined,
+  skipped: true,
+});
 // //// /定义嵌套 `Codex` 的公共参数与任务模型 ////
+
+// //// 读取 transcript 的第一条 JSON 记录 [@x380kkm 2026-07-16] ////
+function readFirstTranscriptRecord(transcriptPath) {
+  const file = fs.openSync(transcriptPath, "r");
+  const chunks = [];
+  const buffer = Buffer.allocUnsafe(64 * 1024);
+
+  try {
+    while (true) {
+      const bytesRead = fs.readSync(file, buffer, 0, buffer.length, null);
+      if (bytesRead === 0) break;
+
+      const chunk = buffer.subarray(0, bytesRead);
+      const newline = chunk.indexOf(0x0a);
+      if (newline >= 0) {
+        chunks.push(chunk.subarray(0, newline));
+        break;
+      }
+      chunks.push(Buffer.from(chunk));
+    }
+  } finally {
+    fs.closeSync(file);
+  }
+
+  const line = Buffer.concat(chunks).toString("utf8").replace(/^\uFEFF+/, "").replace(/\r$/, "");
+  return line ? JSON.parse(line) : null;
+}
+// //// /读取 transcript 的第一条 JSON 记录 ////
+
+// //// 确认 hook 来自 root thread [@x380kkm 2026-07-16] ////
+export function isRootThreadHook(hookInput) {
+  if (hookInput?.parent_thread_id || hookInput?.source?.subagent) return false;
+
+  const directSource = hookInput?.thread_source;
+  if (directSource === "subagent") return false;
+  if (directSource === "user") return true;
+
+  const transcriptPath = hookInput?.transcript_path;
+  if (typeof transcriptPath !== "string" || !transcriptPath) return false;
+
+  try {
+    const record = readFirstTranscriptRecord(transcriptPath);
+    const payload = record?.type === "session_meta" ? record.payload : null;
+    if (!payload || payload.thread_source !== "user") return false;
+    if (payload.parent_thread_id || payload.source?.subagent) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+// //// /确认 hook 来自 root thread ////
 
 // //// 截断模型输入并保留首尾上下文 [@x380kkm 2026-07-15] ////
 export function truncateModelInput(text, maxChars) {
@@ -63,6 +125,8 @@ export function truncateModelInput(text, maxChars) {
 
 // //// 使用指定任务模型启动嵌套 `Codex` 子进程 [@x380kkm 2026-07-15] ////
 function runNestedCodex(modelConfig, options) {
+  if (!isRootThreadHook(options.hookInput)) return SKIPPED_RESULT;
+
   const args = [
     ...CODEX_EXEC_ARGS,
     "--model",
@@ -80,7 +144,7 @@ function runNestedCodex(modelConfig, options) {
     ...(options.env ?? {}),
     CODEX_HOOK_NESTED: "1",
   };
-  const { maxInputChars, ...spawnOptions } = options;
+  const { hookInput, maxInputChars, ...spawnOptions } = options;
   const input = truncateModelInput(
     spawnOptions.input,
     maxInputChars ?? modelConfig.maxInputChars,
