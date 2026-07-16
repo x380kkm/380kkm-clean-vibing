@@ -197,6 +197,13 @@ when refactoring.
   and per-file reads. Use the current Codex model configuration unless a custom
   agent file states a narrower tool or sandbox boundary. Audit agents diagnose
   only, never edit.
+- Delegation depth is capped at 2 below the main thread: main thread depth 0,
+  subagent depth 1, and tool agent depth 2. A depth-2 agent never calls
+  `spawn_agent`.
+- The main thread always passes an explicit `wait_agent.timeout_ms`. The
+  operational minimum is 20000, the default is 60000, and the maximum effective
+  wait is 7200000. The maximum uses at most two consecutive 3600000 calls
+  because one tool call retains the 3600000 hard limit.
 - A failed audit loops to a fix round, then re-audit, until clean or the
   round cap hits.
 
